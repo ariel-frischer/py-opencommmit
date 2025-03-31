@@ -1,0 +1,11 @@
+
+[build-system]
+requires = ["uv>=0.5.9"]
+build-backend = "uv.build"
+
+[project]
+name = "opencommit"
+version = "0.1.0"
+dependencies = [
+    "litellm>=1.0.0"
+]
