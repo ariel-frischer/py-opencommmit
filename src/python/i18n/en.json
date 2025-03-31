@@ -1,0 +1,21 @@
+{
+  "localLanguage": "english",
+  "commitFix": "fix(server.ts): change port variable case from lowercase port to uppercase PORT to improve semantics",
+  "commitFeat": "feat(server.ts): add support for process.env.PORT environment variable to be able to run app on a configurable port",
+  "commitDescription": "The port variable is now named PORT, which improves consistency with the naming conventions as PORT is a constant. Support for an environment variable allows the application to be more flexible as it can now run on any available port specified via the process.env.PORT environment variable.",
+  "commitFixOmitScope": "fix: change port variable case from lowercase port to uppercase PORT to improve semantics",
+  "commitFeatOmitScope": "feat: add support for process.env.PORT environment variable to be able to run app on a configurable port",
+  "error": "Error",
+  "warning": "Warning",
+  "info": "Info",
+  "success": "Success",
+  "noChangesDetected": "No changes detected",
+  "generatingCommitMessage": "Generating commit message",
+  "commitMessageGenerated": "Commit message generated",
+  "confirmCommit": "Do you want to commit with this message?",
+  "commitSuccess": "Changes committed successfully",
+  "invalidGitRepo": "Not a git repository",
+  "configSaved": "Configuration saved successfully",
+  "githookInstalled": "Git hook installed successfully",
+  "githookRemoved": "Git hook removed successfully"
+}
