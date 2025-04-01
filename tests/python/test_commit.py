@@ -5,7 +5,7 @@ import sys
 import subprocess
 from unittest.mock import patch, MagicMock
 from rich.console import Console
-from src.python.commands.commit import (
+from py_opencommit.commands.commit import (
     generate_commit_message,
     check_message_template,
     apply_template,
@@ -112,17 +112,17 @@ index 9876543..fedcba 100644
 
 def test_chunk_diff(mock_staged_diff):
     """Test chunk_diff function."""
-    with patch('src.python.commands.commit.token_count', return_value=100):
+    with patch('py_opencommit.commands.commit.token_count', return_value=100):
         # Test single chunk (small diff)
         chunks = chunk_diff(mock_staged_diff)
         assert len(chunks) == 1
         assert chunks[0] == mock_staged_diff
     
-    with patch('src.python.commands.commit.token_count') as mock_token_count:
+    with patch('py_opencommit.commands.commit.token_count') as mock_token_count:
         # Simulate large diff requiring chunking
         mock_token_count.side_effect = lambda text: 5000 if text == mock_staged_diff else 1000
         
-        with patch('src.python.commands.commit.split_diff_by_files') as mock_split:
+        with patch('py_opencommit.commands.commit.split_diff_by_files') as mock_split:
             file_diffs = {
                 "file1.txt": "diff for file1",
                 "file2.txt": "diff for file2"

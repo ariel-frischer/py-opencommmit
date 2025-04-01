@@ -6,14 +6,14 @@ import pytest
 from unittest.mock import patch
 import os
 from click.testing import CliRunner
-from src.python.cli import cli
-from src.python.i18n import get_text, load_translations
+from py_opencommit.cli import cli
+from py_opencommit.i18n import get_text, load_translations
 
 @pytest.fixture
 def runner():
     return CliRunner()
 
-@patch('src.python.commands.commit.commit')
+@patch('py_opencommit.commands.commit.commit')
 def test_cli_with_language_option(mock_commit, runner):
     """Test that the CLI correctly handles the language option."""
     # Mock the commit command to prevent actual execution
@@ -29,7 +29,7 @@ def test_cli_with_language_option(mock_commit, runner):
     # Output contains ANSI color codes, so just check for part of the message
     assert "invalid" in result.output and "Using default language" in result.output
 
-@patch('src.python.commands.commit.commit')
+@patch('py_opencommit.commands.commit.commit')
 def test_language_environment_variable(mock_commit, runner):
     """Test that the language can be set via environment variable."""
     # Mock the commit command to prevent actual execution

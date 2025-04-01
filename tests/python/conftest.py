@@ -9,9 +9,10 @@ from unittest.mock import patch, MagicMock
 from click.testing import CliRunner
 
 # Add project root to Python path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+# No longer needed if installed editable or tests run via pytest from root
+# sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
-from src.python.commands.config import ConfigKeys, DEFAULT_CONFIG
+from py_opencommit.commands.config import ConfigKeys, DEFAULT_CONFIG
 
 
 @pytest.fixture
@@ -23,8 +24,8 @@ def runner():
 @pytest.fixture
 def mock_git_repo():
     """Mock being in a git repository."""
-    with patch('src.python.utils.git.get_git_root', return_value='/fake/git/repo'):
-        with patch('src.python.utils.git.is_git_repository', return_value=True):
+    with patch('py_opencommit.utils.git.get_git_root', return_value='/fake/git/repo'):
+        with patch('py_opencommit.utils.git.is_git_repository', return_value=True):
             yield
 
 
@@ -46,7 +47,7 @@ index 9876543..fedcba 100644
 @@ -1,2 +1 @@
 -line1
  line2"""
-    with patch('src.python.utils.git.get_staged_diff', return_value=diff):
+    with patch('py_opencommit.utils.git.get_staged_diff', return_value=diff):
         yield diff
 
 
@@ -54,8 +55,8 @@ index 9876543..fedcba 100644
 def mock_staged_files():
     """Mock list of staged files."""
     files = ['file1.txt', 'file2.txt']
-    with patch('src.python.utils.git.get_staged_files', return_value=files):
-        with patch('src.python.commands.commit.get_staged_files', return_value=files):
+    with patch('py_opencommit.utils.git.get_staged_files', return_value=files):
+        with patch('py_opencommit.commands.commit.get_staged_files', return_value=files):
             yield files
 
 
@@ -80,7 +81,7 @@ def temp_global_config_file():
         f.write("OCO_EMOJI = true\n")
         temp_path = f.name
     
-    with patch('src.python.commands.config.get_global_config_path', return_value=Path(temp_path)):
+    with patch('py_opencommit.commands.config.get_global_config_path', return_value=Path(temp_path)):
         yield temp_path
     
     # Clean up
@@ -97,7 +98,7 @@ def temp_project_config_file():
         f.write("OCO_WHY=true\n")
         temp_path = f.name
     
-    with patch('src.python.commands.config.get_project_config_path', return_value=Path(temp_path)):
+    with patch('py_opencommit.commands.config.get_project_config_path', return_value=Path(temp_path)):
         yield temp_path
     
     # Clean up

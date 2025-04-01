@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock, call
 
 
-from src.python.utils.git import (
+from py_opencommit.utils.git import (
     GitError,
     _run_git_command,
     get_git_root,
@@ -87,7 +87,7 @@ class TestGitUtils:
     
     def test_get_git_root(self):
         """Test getting git repository root."""
-        with patch('src.python.utils.git._run_git_command') as mock_cmd:
+        with patch('py_opencommit.utils.git._run_git_command') as mock_cmd:
             mock_result = MagicMock()
             mock_result.stdout = "/path/to/repo\n"
             mock_cmd.return_value = mock_result
@@ -98,7 +98,7 @@ class TestGitUtils:
     
     def test_get_git_root_error(self):
         """Test get_git_root error handling."""
-        with patch('src.python.utils.git._run_git_command') as mock_cmd:
+        with patch('py_opencommit.utils.git._run_git_command') as mock_cmd:
             mock_cmd.side_effect = GitError("Not a git repository")
             
             result = get_git_root()
@@ -106,7 +106,7 @@ class TestGitUtils:
     
     def test_is_git_repository(self):
         """Test checking if current directory is a git repository."""
-        with patch('src.python.utils.git.get_git_root') as mock_get_root:
+        with patch('py_opencommit.utils.git.get_git_root') as mock_get_root:
             # Test with git repo
             mock_get_root.return_value = "/path/to/repo"
             assert is_git_repository() is True
@@ -117,7 +117,7 @@ class TestGitUtils:
     
     def test_assert_git_repo(self):
         """Test asserting that we're in a git repository."""
-        with patch('src.python.utils.git._run_git_command') as mock_cmd:
+        with patch('py_opencommit.utils.git._run_git_command') as mock_cmd:
             # Test success case
             assert_git_repo()  # Should not raise exception
             mock_cmd.assert_called_once_with(["git", "rev-parse", "--is-inside-work-tree"])
@@ -130,7 +130,7 @@ class TestGitUtils:
     
     def test_get_staged_files(self):
         """Test getting staged files."""
-        with patch('src.python.utils.git._run_git_command') as mock_cmd:
+        with patch('py_opencommit.utils.git._run_git_command') as mock_cmd:
             mock_result = MagicMock()
             mock_result.stdout = "file1.txt\nfile2.txt\ndir/file3.txt\n"
             mock_cmd.return_value = mock_result
@@ -141,7 +141,7 @@ class TestGitUtils:
     
     def test_get_changed_files(self):
         """Test getting all changed files (staged and unstaged)."""
-        with patch('src.python.utils.git._run_git_command') as mock_cmd:
+        with patch('py_opencommit.utils.git._run_git_command') as mock_cmd:
             # Mock two different calls for staged and unstaged files
             mock_cmd.side_effect = [
                 MagicMock(stdout="file1.txt\nfile2.txt\n"),  # staged
@@ -155,7 +155,7 @@ class TestGitUtils:
     
     def test_get_staged_diff(self):
         """Test getting staged diff."""
-        with patch('src.python.utils.git._run_git_command') as mock_cmd:
+        with patch('py_opencommit.utils.git._run_git_command') as mock_cmd:
             mock_result = MagicMock()
             mock_result.stdout = "diff --git a/file1.txt b/file1.txt\nindex 123..456 100644\n--- a/file1.txt\n+++ b/file1.txt\n"
             mock_cmd.return_value = mock_result
@@ -166,7 +166,7 @@ class TestGitUtils:
     
     def test_get_staged_diff_error(self):
         """Test error handling in get_staged_diff."""
-        with patch('src.python.utils.git._run_git_command') as mock_cmd:
+        with patch('py_opencommit.utils.git._run_git_command') as mock_cmd:
             mock_cmd.side_effect = GitError("Command failed")
             
             with pytest.raises(GitError) as excinfo:
@@ -220,7 +220,7 @@ index 9876543..fedcba 100644
     
     def test_stage_files(self):
         """Test staging files."""
-        with patch('src.python.utils.git._run_git_command') as mock_cmd:
+        with patch('py_opencommit.utils.git._run_git_command') as mock_cmd:
             files = ["file1.txt", "file2.txt", "path/to/file3.txt"]
             stage_files(files)
             
@@ -232,7 +232,7 @@ index 9876543..fedcba 100644
     
     def test_stage_files_empty(self):
         """Test staging with empty file list."""
-        with patch('src.python.utils.git._run_git_command') as mock_cmd:
+        with patch('py_opencommit.utils.git._run_git_command') as mock_cmd:
             # Empty list should be a no-op
             stage_files([])
             mock_cmd.assert_not_called()
@@ -243,7 +243,7 @@ index 9876543..fedcba 100644
     
     def test_stage_files_error(self):
         """Test error handling when staging files."""
-        with patch('src.python.utils.git._run_git_command') as mock_cmd:
+        with patch('py_opencommit.utils.git._run_git_command') as mock_cmd:
             mock_cmd.side_effect = GitError("Command failed")
             
             with pytest.raises(GitError) as excinfo:
@@ -253,14 +253,14 @@ index 9876543..fedcba 100644
     
     def test_stage_all_changes(self):
         """Test staging all changes."""
-        with patch('src.python.utils.git._run_git_command') as mock_cmd:
+        with patch('py_opencommit.utils.git._run_git_command') as mock_cmd:
             stage_all_changes()
             
             mock_cmd.assert_called_once_with(["git", "add", "-A"])
     
     def test_stage_all_changes_error(self):
         """Test error handling when staging all changes."""
-        with patch('src.python.utils.git._run_git_command') as mock_cmd:
+        with patch('py_opencommit.utils.git._run_git_command') as mock_cmd:
             mock_cmd.side_effect = GitError("Command failed")
             
             with pytest.raises(GitError) as excinfo:
@@ -270,7 +270,7 @@ index 9876543..fedcba 100644
     
     def test_get_commit_template(self):
         """Test getting commit template."""
-        with patch('src.python.utils.git._run_git_command') as mock_cmd, \
+        with patch('py_opencommit.utils.git._run_git_command') as mock_cmd, \
              patch('os.path.exists', return_value=True), \
              patch('builtins.open', MagicMock()):
             
@@ -286,7 +286,7 @@ index 9876543..fedcba 100644
     
     def test_get_commit_template_not_configured(self):
         """Test getting commit template when none is configured."""
-        with patch('src.python.utils.git._run_git_command') as mock_cmd:
+        with patch('py_opencommit.utils.git._run_git_command') as mock_cmd:
             # Mock no commit.template configuration
             mock_cmd.return_value = MagicMock(returncode=1, stdout="")
             
@@ -325,7 +325,7 @@ index 9876543..fedcba 100644
     ])
     def test_has_staged_changes(self, returncode, expected):
         """Test checking for staged changes."""
-        with patch('src.python.utils.git._run_git_command') as mock_cmd:
+        with patch('py_opencommit.utils.git._run_git_command') as mock_cmd:
             mock_result = MagicMock()
             mock_result.returncode = returncode
             mock_cmd.return_value = mock_result
@@ -338,7 +338,7 @@ index 9876543..fedcba 100644
     ])
     def test_has_unstaged_changes(self, returncode, expected):
         """Test checking for unstaged changes."""
-        with patch('src.python.utils.git._run_git_command') as mock_cmd:
+        with patch('py_opencommit.utils.git._run_git_command') as mock_cmd:
             mock_result = MagicMock()
             mock_result.returncode = returncode
             mock_cmd.return_value = mock_result
@@ -347,9 +347,9 @@ index 9876543..fedcba 100644
     
     def test_get_repo_status(self):
         """Test getting repository status."""
-        with patch('src.python.utils.git.has_staged_changes', return_value=True), \
-             patch('src.python.utils.git.has_unstaged_changes', return_value=False), \
-             patch('src.python.utils.git.get_git_root', return_value="/path/to/repo"):
+        with patch('py_opencommit.utils.git.has_staged_changes', return_value=True), \
+             patch('py_opencommit.utils.git.has_unstaged_changes', return_value=False), \
+             patch('py_opencommit.utils.git.get_git_root', return_value="/path/to/repo"):
             
             status = get_repo_status()
             assert status["has_staged_changes"] is True
@@ -358,7 +358,7 @@ index 9876543..fedcba 100644
     
     def test_commit(self):
         """Test committing changes."""
-        with patch('src.python.utils.git._run_git_command') as mock_cmd:
+        with patch('py_opencommit.utils.git._run_git_command') as mock_cmd:
             mock_result = MagicMock()
             mock_result.stdout = "1 file changed, 2 insertions(+)"
             mock_cmd.return_value = mock_result
@@ -370,7 +370,7 @@ index 9876543..fedcba 100644
     
     def test_commit_with_args(self):
         """Test committing changes with additional args."""
-        with patch('src.python.utils.git._run_git_command') as mock_cmd:
+        with patch('py_opencommit.utils.git._run_git_command') as mock_cmd:
             mock_result = MagicMock()
             mock_result.stdout = "1 file changed, 2 insertions(+)"
             mock_cmd.return_value = mock_result
@@ -384,7 +384,7 @@ index 9876543..fedcba 100644
     
     def test_commit_error(self):
         """Test error handling when committing changes."""
-        with patch('src.python.utils.git._run_git_command') as mock_cmd:
+        with patch('py_opencommit.utils.git._run_git_command') as mock_cmd:
             mock_cmd.side_effect = GitError("Command failed")
             
             success, output = commit("Test commit message")

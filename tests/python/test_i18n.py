@@ -3,7 +3,7 @@ Tests for the i18n module.
 """
 
 import pytest
-from src.python.i18n import get_text, get_language_from_alias, load_translations
+from py_opencommit.i18n import get_text, get_language_from_alias, load_translations
 
 def test_get_text_default_language():
     """Test getting text with default language."""

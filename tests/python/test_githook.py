@@ -7,13 +7,13 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 import pytest
 
-from src.python.commands.githook import githook, HOOK_CONTENT
+from py_opencommit.commands.githook import githook, HOOK_CONTENT
 
 
 def test_githook_not_in_git_repo():
     """Test githook command outside git repository."""
-    with patch('src.python.commands.githook.get_git_root', return_value=None):
-        with patch('src.python.commands.githook.console') as mock_console:
+    with patch('py_opencommit.commands.githook.get_git_root', return_value=None):
+        with patch('py_opencommit.commands.githook.console') as mock_console:
             githook()
             mock_console.print.assert_called_once()
             assert "Error" in mock_console.print.call_args[0][0]
@@ -29,8 +29,8 @@ def test_githook_installation():
         hooks_dir.mkdir(parents=True, exist_ok=True)
         
         # Run the githook function with mocked git_root
-        with patch('src.python.commands.githook.get_git_root', return_value=temp_dir):
-            with patch('src.python.commands.githook.console') as mock_console:
+        with patch('py_opencommit.commands.githook.get_git_root', return_value=temp_dir):
+            with patch('py_opencommit.commands.githook.console') as mock_console:
                 githook()
                 
                 # Verify hook file was created
@@ -84,8 +84,8 @@ def test_githook_overwrite_existing():
             f.write("#!/bin/sh\necho 'Existing hook'\n")
         
         # Run the githook function with mocked git_root
-        with patch('src.python.commands.githook.get_git_root', return_value=temp_dir):
-            with patch('src.python.commands.githook.console'):
+        with patch('py_opencommit.commands.githook.get_git_root', return_value=temp_dir):
+            with patch('py_opencommit.commands.githook.console'):
                 githook()
                 
                 # Verify file was overwritten

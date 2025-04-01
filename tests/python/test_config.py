@@ -9,7 +9,7 @@ import pytest
 from configparser import ConfigParser
 
 
-from src.python.commands.config import (
+from py_opencommit.commands.config import (
     get_config,
     get_global_config,
     get_project_config,
@@ -41,7 +41,7 @@ from src.python.commands.config import (
 
 def test_get_global_config(temp_global_config_file):
     """Test getting global configuration."""
-    with mock.patch('src.python.commands.config.get_global_config_path', return_value=Path(temp_global_config_file)):
+    with mock.patch('py_opencommit.commands.config.get_global_config_path', return_value=Path(temp_global_config_file)):
         config = get_global_config()
         assert config["OCO_API_KEY"] == "test-api-key"
         assert config["OCO_MODEL"] == "gpt-3.5-turbo"
@@ -50,7 +50,7 @@ def test_get_global_config(temp_global_config_file):
 
 def test_get_project_config(temp_project_config_file):
     """Test getting project configuration."""
-    with mock.patch('src.python.commands.config.get_project_config_path', return_value=Path(temp_project_config_file)):
+    with mock.patch('py_opencommit.commands.config.get_project_config_path', return_value=Path(temp_project_config_file)):
         config = get_project_config()
         assert config["OCO_API_KEY"] == "project-api-key"
         assert config["OCO_MODEL"] == "gpt-4"
@@ -237,8 +237,8 @@ def test_parse_config_value():
 
 def test_get_config_precedence(temp_global_config_file, temp_project_config_file, mock_env_vars):
     """Test configuration precedence."""
-    with mock.patch('src.python.commands.config.get_global_config_path', return_value=Path(temp_global_config_file)), \
-         mock.patch('src.python.commands.config.get_project_config_path', return_value=Path(temp_project_config_file)):
+    with mock.patch('py_opencommit.commands.config.get_global_config_path', return_value=Path(temp_global_config_file)), \
+         mock.patch('py_opencommit.commands.config.get_project_config_path', return_value=Path(temp_project_config_file)):
         
         config = get_config()
         
@@ -263,7 +263,7 @@ def test_set_global_config():
         temp_path = temp_file.name
     
     try:
-        with mock.patch('src.python.commands.config.get_global_config_path', return_value=Path(temp_path)):
+        with mock.patch('py_opencommit.commands.config.get_global_config_path', return_value=Path(temp_path)):
             set_global_config("OCO_API_KEY", "new-api-key")
             set_global_config("OCO_MODEL", "gpt-4")
             
@@ -308,8 +308,8 @@ def test_set_project_config():
 
 def test_config_command_get():
     """Test config command get mode."""
-    with mock.patch('src.python.commands.config.get_config', return_value={"OCO_API_KEY": "test-key"}):
-        with mock.patch('src.python.commands.config.console') as mock_console:
+    with mock.patch('py_opencommit.commands.config.get_config', return_value={"OCO_API_KEY": "test-key"}):
+        with mock.patch('py_opencommit.commands.config.console') as mock_console:
             config(ConfigModes.GET)
             mock_console.print.assert_called_with("OCO_API_KEY = test-key")
             
@@ -327,8 +327,8 @@ def test_config_command_get():
 
 def test_config_command_set():
     """Test config command set mode."""
-    with mock.patch('src.python.commands.config.set_global_config') as mock_set_global:
-        with mock.patch('src.python.commands.config.console') as mock_console:
+    with mock.patch('py_opencommit.commands.config.set_global_config') as mock_set_global:
+        with mock.patch('py_opencommit.commands.config.console') as mock_console:
             config(ConfigModes.SET, "OCO_API_KEY", "test-key")
             mock_set_global.assert_called_with("OCO_API_KEY", "test-key")
             assert any("Success" in str(call) for call in mock_console.print.call_args_list)
@@ -336,7 +336,7 @@ def test_config_command_set():
             # Test with project flag
             mock_set_global.reset_mock()
             mock_console.print.reset_mock()
-            with mock.patch('src.python.commands.config.set_project_config') as mock_set_project:
+            with mock.patch('py_opencommit.commands.config.set_project_config') as mock_set_project:
                 config(ConfigModes.SET, "OCO_API_KEY", "test-key", True)
                 mock_set_project.assert_called_with("OCO_API_KEY", "test-key")
                 assert any("Success" in str(call) for call in mock_console.print.call_args_list)
@@ -370,15 +370,15 @@ def test_migration_runner():
             TestMigration.was_run = True
     
     # Mock completed migrations
-    with mock.patch('src.python.commands.config.get_completed_migrations', return_value=[]):
+    with mock.patch('py_opencommit.commands.config.get_completed_migrations', return_value=[]):
         # Mock global config path exists
-        with mock.patch('src.python.commands.config.get_global_config_path') as mock_path:
+        with mock.patch('py_opencommit.commands.config.get_global_config_path') as mock_path:
             mock_path.return_value.exists.return_value = True
             
             # Mock config
-            with mock.patch('src.python.commands.config.get_config', return_value={"OCO_AI_PROVIDER": "openai"}):
+            with mock.patch('py_opencommit.commands.config.get_config', return_value={"OCO_AI_PROVIDER": "openai"}):
                 # Mock save_completed_migration
-                with mock.patch('src.python.commands.config.save_completed_migration'):
+                with mock.patch('py_opencommit.commands.config.save_completed_migration'):
                     test_migration = TestMigration()
                     MigrationRunner.run_migrations([test_migration])
                     
@@ -393,7 +393,7 @@ def test_get_completed_migrations():
         temp_path = temp_file.name
     
     try:
-        with mock.patch('src.python.commands.config.get_migrations_file_path', return_value=Path(temp_path)):
+        with mock.patch('py_opencommit.commands.config.get_migrations_file_path', return_value=Path(temp_path)):
             migrations = get_completed_migrations()
             assert "migration1" in migrations
             assert "migration2" in migrations
@@ -410,7 +410,7 @@ def test_save_completed_migration():
         temp_path = temp_file.name
     
     try:
-        with mock.patch('src.python.commands.config.get_migrations_file_path', return_value=Path(temp_path)):
+        with mock.patch('py_opencommit.commands.config.get_migrations_file_path', return_value=Path(temp_path)):
             save_completed_migration("new_migration")
             
             # Read the file directly to verify
