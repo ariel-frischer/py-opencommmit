@@ -353,16 +353,13 @@ IMPORTANT: If the provided diff contains multiple distinct logical changes (e.g.
 Examples (assuming OCO_OMIT_SCOPE=false):
 
 Single Change (Single File):
-```
 feat(auth.py): implement OAuth2 authentication flow
 
 Add OAuth2 authentication support with Google and GitHub providers.
 This improves security by using industry-standard protocols and allows users
 to log in with existing accounts, reducing onboarding friction.
-```
 
 Multiple Distinct Changes (Multiple Files):
-```
 refactor(auth.py, user.py): simplify login logic and database schema
 
 Streamline the authentication process and update user table structure for clarity.
@@ -370,7 +367,6 @@ Streamline the authentication process and update user table structure for clarit
 feat(profile.html): add user profile editing feature
 
 Allow users to update their display name and profile picture.
-```
 
 NEVER generate a commit message {'with a scope in parentheses' if omit_scope else 'without a scope in parentheses containing the relevant filename(s)'}. The scope MUST contain the filename(s) affected by the change described in that line.
 """
@@ -465,7 +461,6 @@ def create_consistency_prompt(prompts: List[str]) -> List[Dict[str, str]]:
     
     system_content += "JSON Output Format:\n"
     system_content += "- The JSON output should contain the commit messages for a bug fix and a new feature in the following format:\n"
-    system_content += "```json\n"
     system_content += "{\n"
     system_content += f'  "localLanguage": "{local_language}",\n'
     system_content += '  "commitFix": "<Header of commit for bug fix with scope>",\n'
@@ -473,8 +468,7 @@ def create_consistency_prompt(prompts: List[str]) -> List[Dict[str, str]]:
     system_content += '  "commitFixOmitScope": "<Header of commit for bug fix without scope>",\n'
     system_content += '  "commitFeatOmitScope": "<Header of commit for feature without scope>",\n'
     system_content += '  "commitDescription": "<Description of commit for both the bug fix and the feature>"\n'
-    system_content += "}\n"
-    system_content += "```\n\n"
+    system_content += "}\n\n"
     
     system_content += "- The \"commitDescription\" should not include the commit message's header, only the description.\n"
     system_content += "- Description should not be more than 74 characters.\n\n"

@@ -689,6 +689,34 @@ def convert_bools_to_strings(obj):
         return obj
 
 
+def strip_backticks(message: str) -> str:
+    """
+    Remove backtick fences from commit messages.
+    
+    Args:
+        message: The commit message that might contain backticks
+        
+    Returns:
+        Cleaned commit message without backtick fences
+    """
+    # Remove triple backtick blocks
+    if message.startswith("```") and message.endswith("```"):
+        # Remove opening and closing backticks
+        message = message[3:].rstrip()[:-3].strip()
+        
+    # Remove any language specifier after opening backticks
+    lines = message.split("\n")
+    if lines and lines[0].startswith("```"):
+        lines[0] = ""
+        message = "\n".join(lines).strip()
+        
+    # Remove any remaining backtick fences
+    message = re.sub(r'^```\w*\s*\n', '', message, flags=re.MULTILINE)
+    message = re.sub(r'\n```\s*$', '', message, flags=re.MULTILINE)
+    
+    return message
+
+
 def apply_template(
     message: str, template: str, placeholder: str = DEFAULT_TEMPLATE_PLACEHOLDER
 ) -> str:
@@ -703,7 +731,9 @@ def apply_template(
     Returns:
         Formatted commit message
     """
-    return template.replace(placeholder, message)
+    # First strip any backticks from the message
+    cleaned_message = strip_backticks(message)
+    return template.replace(placeholder, cleaned_message)
 
 
 def run_git_commit(message: str, extra_args: List[str]) -> bool:
@@ -722,8 +752,11 @@ def run_git_commit(message: str, extra_args: List[str]) -> bool:
         arg for arg in extra_args if DEFAULT_TEMPLATE_PLACEHOLDER not in arg
     ]
 
+    # Clean the message by removing any backticks
+    clean_message = strip_backticks(message)
+    
     # Prepare the commit command
-    cmd = ["git", "commit", "-m", message] + filtered_args
+    cmd = ["git", "commit", "-m", clean_message] + filtered_args
 
     logger.debug(f"Running git commit command: {cmd}")
 
@@ -865,6 +898,9 @@ def commit(
         if template:
             message = apply_template(message, template)
 
+        # Clean the message by removing any backticks
+        message = strip_backticks(message)
+        
         # Display the generated message
         console.print(
             Panel(
