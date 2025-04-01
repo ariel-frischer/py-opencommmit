@@ -798,8 +798,8 @@ def commit(
                 marker = "[bright_magenta](untracked)[/bright_magenta]" if file in untracked_files else ""
                 console.print(f"  - {file} {marker}")
 
-            # Ask if user wants to stage all files
-            if Confirm.ask("Do you want to stage all changes (modified and untracked) and generate commit message?"):
+            # Ask if user wants to stage all files, default to Yes
+            if Confirm.ask("Do you want to stage all changes (modified and untracked) and generate commit message?", default=True):
                 console.print("Staging all changes...")
                 stage_all_changes()
                 # Get the diff again after staging
@@ -877,7 +877,8 @@ def commit(
         # Convert skip_confirm to boolean if it's a string
         skip_confirm_bool = skip_confirm if isinstance(skip_confirm, bool) else skip_confirm.lower() in ('true', 'yes', '1', 'y')
         if not skip_confirm_bool:
-            confirmed = Confirm.ask(get_text("confirmCommit"))
+            # Default to Yes for confirmation
+            confirmed = Confirm.ask(get_text("confirmCommit"), default=True)
             if not confirmed:
                 console.print("[yellow]Commit aborted by user.[/yellow]")
                 sys.exit(0)
