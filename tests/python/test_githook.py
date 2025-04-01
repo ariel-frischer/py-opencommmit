@@ -140,26 +140,29 @@ def test_hook_script_handles_merge_commit():
         mock_run = MagicMock()
         mock_subprocess.run = mock_run
         mock_subprocess.CalledProcessError = Exception
-        
-        # Create globals dictionary for script execution
+
+        # Define globals for the exec environment, excluding sys
         hook_globals = {
-            'sys': MagicMock(argv=['prepare-commit-msg', str(commit_msg_file)]),
             'subprocess': mock_subprocess,
             'os': MagicMock(path=MagicMock(exists=MagicMock(return_value=True)))
+            # sys will be handled by the patch below
         }
-        
+
         # Mock open to read merge commit message
         mock_open = MagicMock()
         mock_context = MagicMock()
         mock_context.__enter__.return_value.read.return_value = "Merge branch 'feature' into 'main'"
         mock_open.return_value = mock_context
-        
+
         # Execute the hook script in our controlled environment
-        with patch('builtins.open', mock_open):
+        # Patch sys.argv specifically for the exec call
+        with patch('builtins.open', mock_open), \
+             patch('sys.argv', ['prepare-commit-msg', str(commit_msg_file)]):
             try:
+                # Pass only necessary globals, let exec find the patched sys
                 exec(hook_script, hook_globals)
             except SystemExit as e:
                 assert e.code == 0  # Expected to exit with success
-        
+
         # Verify the script did NOT call subprocess.run (should skip for merge commits)
-        assert not mock_run.called, "subprocess.run should not be called for merge commits"
+        mock_run.assert_not_called()

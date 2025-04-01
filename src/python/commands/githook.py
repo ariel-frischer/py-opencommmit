@@ -20,10 +20,10 @@ commit_msg_file = sys.argv[1]
 # Check if this is an amended commit or a merge commit
 if os.path.exists(commit_msg_file):
     with open(commit_msg_file, 'r') as f:
-        commit_msg = f.read()
-    
-    # Skip if it's a merge commit or already has a message
-    if commit_msg.startswith('Merge') or len(commit_msg.strip()) > 0:
+        commit_msg = f.read().strip() # Read and strip whitespace
+
+    # Skip if it's a merge commit (starts with Merge) or already has content
+    if commit_msg.startswith('Merge') or commit_msg:
         sys.exit(0)
 
 # Run opencommit to generate the commit message

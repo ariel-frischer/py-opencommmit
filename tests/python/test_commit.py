@@ -129,7 +129,8 @@ def test_chunk_diff(mock_staged_diff):
             }
             mock_split.return_value = file_diffs
             
-            chunks = chunk_diff(mock_staged_diff, max_tokens=1500)
+            # Updated keyword argument from max_tokens to max_tokens_per_chunk
+            chunks = chunk_diff(mock_staged_diff, max_tokens_per_chunk=1500)
             assert len(chunks) == 2
             assert chunks[0] == "diff for file1"
             assert chunks[1] == "diff for file2"
@@ -143,7 +144,8 @@ def test_create_commit_prompt():
     messages = create_commit_prompt(diff)
     assert len(messages) == 2
     assert messages[0]["role"] == "system"
-    assert "You are a commit message generator" in messages[0]["content"]
+    # Updated assertion to match the new prompt identity
+    assert "You are an AI assistant specialized" in messages[0]["content"]
     assert messages[1]["role"] == "user"
     assert diff in messages[1]["content"]
     

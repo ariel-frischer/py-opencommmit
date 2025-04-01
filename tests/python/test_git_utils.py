@@ -224,8 +224,11 @@ index 9876543..fedcba 100644
             files = ["file1.txt", "file2.txt", "path/to/file3.txt"]
             stage_files(files)
             
-            mock_cmd.assert_called_once()
-            assert mock_cmd.call_args[0][0] == ["git", "add"] + files
+            # Updated assertion: expect one call per file
+            assert mock_cmd.call_count == len(files)
+            # Check that each file was added individually
+            expected_calls = [call(['git', 'add', f]) for f in files]
+            mock_cmd.assert_has_calls(expected_calls, any_order=True)
     
     def test_stage_files_empty(self):
         """Test staging with empty file list."""

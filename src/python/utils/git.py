@@ -267,10 +267,15 @@ def stage_files(files: List[str]) -> None:
     """
     if not files:
         return
-        
+
     try:
         for file in files:
-            _run_git_command(["git", "add", file])
+            # Add check to skip empty or whitespace-only filenames
+            if file and file.strip():
+                _run_git_command(["git", "add", file.strip()])
+            else:
+                # Optionally log a warning or just skip
+                pass 
     except GitError as e:
         raise GitError(f"Failed to stage files: {e}")
 
