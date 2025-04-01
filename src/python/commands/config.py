@@ -406,7 +406,7 @@ DEFAULT_CONFIG = {
 def get_global_config_path() -> Path:
     """Get the path to the global config file."""
     home_dir = Path.home()
-    return home_dir / '.opencommit'
+    return home_dir / '.pyoc'
 
 
 def get_project_config_path() -> Optional[Path]:
@@ -766,7 +766,7 @@ def config(mode: str, key: Optional[str] = None, value: Optional[str] = None, us
 def get_migrations_file_path() -> Path:
     """Get the path to the migrations file."""
     home_dir = Path.home()
-    return home_dir / '.opencommit_migrations'
+    return home_dir / '.pyoc_migrations'
 
 
 def get_completed_migrations() -> List[str]:

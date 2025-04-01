@@ -1,6 +1,6 @@
-# OpenCommit Python CLI
+# PyOC - Python OpenCommit CLI
 
-OpenCommit is an AI-powered git commit message generator. This Python implementation provides the same functionality as the original Node.js CLI tool with a clean, Pythonic interface.
+PyOC is an AI-powered git commit message generator. This Python implementation provides the same functionality as the original Node.js OpenCommit tool with a clean, Pythonic interface.
 
 ## Table of Contents
 
@@ -11,7 +11,7 @@ OpenCommit is an AI-powered git commit message generator. This Python implementa
   - [From Source](#from-source)
 - [Usage](#usage)
   - [Generate Commit Messages](#generate-commit-messages)
-  - [Configure OpenCommit](#configure-opencommit)
+  - [Configure PyOC](#configure-pyoc)
   - [Setup Git Hooks](#setup-git-hooks)
   - [Using the Python Module Directly](#using-the-python-module-directly)
 - [Configuration](#configuration)
@@ -28,15 +28,15 @@ OpenCommit is an AI-powered git commit message generator. This Python implementa
 [pipx](https://pypa.github.io/pipx/) is the recommended installation method for CLI tools as it installs the package in an isolated environment but makes it available globally.
 
 ```bash
-pipx install opencommit
+pipx install pyoc
 ```
 
 ### Using pip
 
-You can install OpenCommit using pip:
+You can install PyOC using pip:
 
 ```bash
-pip install opencommit
+pip install pyoc
 ```
 
 ### Using UV
@@ -44,7 +44,7 @@ pip install opencommit
 [UV](https://github.com/astral-sh/uv) is a fast Python package installer and resolver.
 
 ```bash
-uv install opencommit
+uv install pyoc
 ```
 
 ### From Source
@@ -59,7 +59,7 @@ uv install -e .
 
 ## Usage
 
-Once installed, OpenCommit CLI can be accessed with the `oco` command.
+Once installed, PyOC CLI can be accessed with the `pyoc` command.
 
 ### Generate Commit Messages
 
@@ -67,26 +67,26 @@ Generate an AI-powered commit message from your staged changes:
 
 ```bash
 # Generate commit message from staged changes
-oco commit
+pyoc commit
 
 # Generate commit message and automatically stage all changes
-oco commit --stage-all
+pyoc commit --stage-all
 
 # Generate commit message with additional context
-oco commit --context "This commit fixes the bug in the login form"
+pyoc commit --context "This commit fixes the bug in the login form"
 
 # Skip confirmation prompt
-oco commit --skip-confirmation
+pyoc commit --skip-confirmation
 
 # Pass additional arguments to git commit
-oco commit -- -m "Custom message" --no-verify
+pyoc commit -- -m "Custom message" --no-verify
 ```
 
 #### Example Workflow
 
 ```
 $ git add src/feature.py
-$ oco commit
+$ pyoc commit
 ✨ Analyzing your changes...
 📝 Generated commit message:
    feat: implement user authentication in login form
@@ -95,22 +95,22 @@ $ oco commit
 🎉 Commit successful!
 ```
 
-### Configure OpenCommit
+### Configure PyOC
 
 Configure the CLI settings:
 
 ```bash
 # Show current configuration
-oco config
+pyoc config
 
 # Set OpenAI API key
-oco config --set api_key=sk-your-api-key
+pyoc config --set api_key=sk-your-api-key
 
 # Set preferred language
-oco config --set language=en
+pyoc config --set language=en
 
 # Set model
-oco config --set model=gpt-3.5-turbo
+pyoc config --set model=gpt-3.5-turbo
 ```
 
 ### Setup Git Hooks
@@ -119,18 +119,18 @@ Set up git hooks for automatic commit message generation:
 
 ```bash
 # Install git hooks in the current repository
-oco githook --install
+pyoc githook --install
 
 # Uninstall git hooks
-oco githook --uninstall
+pyoc githook --uninstall
 
 # Show current hook status
-oco githook --status
+pyoc githook --status
 ```
 
 ### Using the Python Module Directly
 
-You can also run OpenCommit directly as a Python module without installing it globally. This is useful for:
+You can also run PyOC directly as a Python module without installing it globally. This is useful for:
 
 - Using the tool without installing it globally
 - Development and testing
@@ -146,7 +146,7 @@ python -m src.python.cli commit --stage-all
 # Generate commit message with additional context
 python -m src.python.cli commit --context "This commit fixes the bug in the login form"
 
-# Configure OpenCommit
+# Configure PyOC
 python -m src.python.cli config --set api_key=sk-your-api-key
 
 # Install git hooks
@@ -168,7 +168,7 @@ $ python -m src.python.cli commit
 
 ## Configuration
 
-OpenCommit can be configured through the CLI, a configuration file, or environment variables.
+PyOC can be configured through the CLI, a configuration file, or environment variables.
 
 ### Available Options
 
@@ -184,13 +184,13 @@ OpenCommit can be configured through the CLI, a configuration file, or environme
 ### Configuration File
 
 The configuration file is located at:
-- Linux/macOS: `~/.config/opencommit/config`
-- Windows: `%USERPROFILE%\.config\opencommit\config`
+- Linux/macOS: `~/.config/pyoc/config`
+- Windows: `%USERPROFILE%\.config\pyoc\config`
 
 Example configuration file:
 
 ```ini
-[opencommit]
+[pyoc]
 api_key = sk-your-api-key
 model = gpt-3.5-turbo
 language = en
@@ -199,7 +199,7 @@ emoji = true
 
 ### Environment Variables
 
-You can also use environment variables to configure OpenCommit:
+You can also use environment variables to configure PyOC:
 
 ```bash
 # Set API key
@@ -214,12 +214,12 @@ export OCO_LANGUAGE=en
 
 ## LiteLLM Integration
 
-OpenCommit Python CLI uses [LiteLLM](https://github.com/BerriAI/litellm) for interfacing with AI providers:
+PyOC uses [LiteLLM](https://github.com/BerriAI/litellm) for interfacing with AI providers:
 
 ```
-┌─────────────┐     ┌───────────┐     ┌─────────────┐
-│ OpenCommit  │────▶│  LiteLLM  │────▶│  OpenAI API │
-└─────────────┘     └───────────┘     └─────────────┘
+┌─────────┐     ┌───────────┐     ┌─────────────┐
+│  PyOC   │────▶│  LiteLLM  │────▶│  OpenAI API │
+└─────────┘     └───────────┘     └─────────────┘
 ```
 
 Benefits of using LiteLLM:
@@ -250,7 +250,7 @@ Error: Invalid API key
 
 Solution: Set your API key using:
 ```bash
-oco config --set api_key=sk-your-api-key
+pyoc config --set api_key=sk-your-api-key
 ```
 
 Or set it as an environment variable:
@@ -282,7 +282,7 @@ git add <files>
 
 Or use the `--stage-all` option:
 ```bash
-oco commit --stage-all
+pyoc commit --stage-all
 ```
 
 #### Large Diffs
@@ -293,7 +293,7 @@ Error: Diff too large for token limit
 
 Solution: Commit changes in smaller batches or use a model with a larger context window:
 ```bash
-oco config --set model=gpt-4-turbo
+pyoc config --set model=gpt-4-turbo
 ```
 
 #### Configuration Errors
@@ -304,7 +304,7 @@ Error: Cannot read configuration file
 
 Solution: Reinitialize the configuration:
 ```bash
-oco config --init
+pyoc config --init
 ```
 
 ### Debugging
@@ -312,7 +312,7 @@ oco config --init
 For advanced debugging, set the debug environment variable:
 
 ```bash
-OCO_DEBUG=1 oco commit
+OCO_DEBUG=1 pyoc commit
 ```
 
 This will provide verbose output to help troubleshoot issues.

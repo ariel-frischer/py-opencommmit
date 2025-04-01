@@ -16,6 +16,12 @@ from rich.panel import Panel
 from rich.progress import Progress
 from rich.prompt import Confirm
 
+# Try to import commitlint prompts
+try:
+    from ..modules.commitlint.prompts import create_commit_prompt as create_commitlint_prompt
+except ImportError:
+    create_commitlint_prompt = None
+
 from ..i18n import get_text
 from ..commands.config import get_config, ConfigKeys
 
@@ -35,12 +41,14 @@ console = Console()
 config = get_config()
 
 # Constants
-MAX_TOKENS = int(
-    config.get(ConfigKeys.OCO_TOKENS_MAX_OUTPUT, 4000)
-)  # Maximum tokens for model input
-MODEL_NAME = config.get(ConfigKeys.OCO_MODEL, "gpt-3.5-turbo")  # Get model from config
+# Use OCO_TOKENS_MAX_INPUT for context window size, OCO_TOKENS_MAX_OUTPUT for response size
+MODEL_CONTEXT_LIMIT = int(config.get(ConfigKeys.OCO_TOKENS_MAX_INPUT, 40960))
+MAX_OUTPUT_TOKENS = int(config.get(ConfigKeys.OCO_TOKENS_MAX_OUTPUT, 1024)) # Increased default output tokens
+MAX_INPUT_TOKENS_PER_CHUNK = int(MODEL_CONTEXT_LIMIT * 0.75) # Reserve 25% for prompt and response
+
+MODEL_NAME = config.get(ConfigKeys.OCO_MODEL, "gpt-4o-mini") # Use a potentially faster/cheaper default
 DEFAULT_TEMPLATE_PLACEHOLDER = config.get(
-    ConfigKeys.OCO_MESSAGE_TEMPLATE_PLACEHOLDER, "{message}"
+    ConfigKeys.OCO_MESSAGE_TEMPLATE_PLACEHOLDER, "$msg" # Match TS placeholder
 )
 
 
@@ -117,13 +125,13 @@ def split_diff_by_files(diff: str) -> Dict[str, str]:
     return file_diffs
 
 
-def chunk_diff(diff: str, max_tokens: int = MAX_TOKENS) -> List[str]:
+def chunk_diff(diff: str, max_tokens_per_chunk: int = MAX_INPUT_TOKENS_PER_CHUNK) -> List[str]:
     """
     Split a large diff into chunks respecting token limits.
 
     Args:
         diff: Git diff to split
-        max_tokens: Maximum tokens per chunk
+        max_tokens_per_chunk: Maximum input tokens per chunk (for the diff part)
 
     Returns:
         List of diff chunks
@@ -131,48 +139,15 @@ def chunk_diff(diff: str, max_tokens: int = MAX_TOKENS) -> List[str]:
     if not diff:
         return []
 
-    # Get model context limit - default to 4000 if we can't determine
-    model_context_limit = 4000
-    if MODEL_NAME:
-        # Approximate context limits for common models
-        model_limits = {
-            "gpt-3.5-turbo": 4096,
-            "gpt-3.5-turbo-16k": 16384,
-            "gpt-4": 8192,
-            "gpt-4-32k": 32768,
-            "gpt-4o": 128000,
-            "gpt-4o-mini": 128000,
-            "claude-3-opus": 200000,
-            "claude-3-sonnet": 200000,
-            "claude-3-haiku": 200000,
-            "gemini-1.5-pro": 1000000,
-            "gemini-1.5-flash": 1000000,
-            "gemini-1.0-pro": 32768,
-        }
-        
-        # Find the closest matching model name
-        for model_name, limit in model_limits.items():
-            if model_name in MODEL_NAME.lower():
-                model_context_limit = limit
-                break
-    
-    # Reserve tokens for the prompt and response
-    # Use 25% of context for prompt and response, 75% for diff
-    safe_token_limit = int(model_context_limit * 0.75)
-    
-    # Ensure max_tokens doesn't exceed safe limit
-    max_tokens = min(max_tokens, safe_token_limit)
-    
     # If diff is small enough, return as is
     diff_tokens = token_count(diff)
-    if diff_tokens <= max_tokens:
+    if diff_tokens <= max_tokens_per_chunk:
         return [diff]
-    
+
     # Log the token counts if logging is enabled
     if not logger.disabled:
-        logger.debug(f"Diff is {diff_tokens} tokens, exceeding limit of {max_tokens}")
-        logger.debug(f"Model context limit: {model_context_limit}")
-        logger.debug(f"Safe token limit: {safe_token_limit}")
+        logger.debug(f"Diff is {diff_tokens} tokens, exceeding chunk limit of {max_tokens_per_chunk}")
+        logger.debug(f"Model context limit: {MODEL_CONTEXT_LIMIT}")
 
     # Split by files first
     file_diffs = split_diff_by_files(diff)
@@ -184,10 +159,10 @@ def chunk_diff(diff: str, max_tokens: int = MAX_TOKENS) -> List[str]:
         file_tokens = token_count(file_diff)
 
         # If a single file diff is too large, split it by hunks or truncate
-        if file_tokens > max_tokens:
+        if file_tokens > max_tokens_per_chunk:
             # Try to split by hunks (git diff sections starting with @@ markers)
             hunks = re.split(r'(^@@.*?@@.*?$)', file_diff, flags=re.MULTILINE)
-            
+
             # If we have hunks, process them individually
             if len(hunks) > 1:
                 # Recombine the split markers with their content
@@ -197,20 +172,21 @@ def chunk_diff(diff: str, max_tokens: int = MAX_TOKENS) -> List[str]:
                         processed_hunks.append(hunks[i] + hunks[i+1])
                     else:
                         processed_hunks.append(hunks[i])
-                
+
                 # Process each hunk
                 for hunk in processed_hunks:
                     hunk_tokens = token_count(hunk)
-                    
+
                     # If hunk is still too large, truncate it
-                    if hunk_tokens > max_tokens:
-                        truncated_hunk = hunk[:int(len(hunk) * max_tokens / hunk_tokens)]
-                        truncated_hunk += "\n# ... (truncated)"
+                    if hunk_tokens > max_tokens_per_chunk:
+                        truncation_ratio = max_tokens_per_chunk / hunk_tokens
+                        truncated_hunk = hunk[:int(len(hunk) * truncation_ratio * 0.9)] # Truncate slightly more to be safe
+                        truncated_hunk += "\n# ... (hunk truncated)"
                         hunk = truncated_hunk
                         hunk_tokens = token_count(hunk)
-                    
+
                     # Add hunk to chunks
-                    if current_tokens + hunk_tokens > max_tokens and current_chunk:
+                    if current_tokens + hunk_tokens > max_tokens_per_chunk and current_chunk:
                         chunks.append(current_chunk)
                         current_chunk = hunk
                         current_tokens = hunk_tokens
@@ -220,19 +196,20 @@ def chunk_diff(diff: str, max_tokens: int = MAX_TOKENS) -> List[str]:
                         current_chunk += hunk
                         current_tokens += hunk_tokens
             else:
-                # No hunks found, truncate the file
-                truncation_ratio = max_tokens / file_tokens
-                truncated_diff = file_diff[:int(len(file_diff) * truncation_ratio * 0.9)]
+                # No hunks found, truncate the file diff
+                truncation_ratio = max_tokens_per_chunk / file_tokens
+                truncated_diff = file_diff[:int(len(file_diff) * truncation_ratio * 0.9)] # Truncate slightly more
                 console.print(
-                    f"[yellow]Warning:[/yellow] Diff for {file_path} is too large ({file_tokens} tokens), truncating to {max_tokens} tokens..."
+                    f"[yellow]Warning:[/yellow] Diff for {file_path} is too large ({file_tokens} tokens), truncating to ~{max_tokens_per_chunk} tokens..."
                 )
-                truncated_diff += "\n# ... (truncated)"
-                
-                # Add truncated diff as its own chunk
-                chunks.append(truncated_diff)
+                truncated_diff += "\n# ... (file truncated)"
+
+                # Add truncated diff as its own chunk if it's not empty
+                if truncated_diff.strip():
+                    chunks.append(truncated_diff)
         else:
             # If adding this file would exceed the limit, start a new chunk
-            if current_tokens + file_tokens > max_tokens and current_chunk:
+            if current_tokens + file_tokens > max_tokens_per_chunk and current_chunk:
                 chunks.append(current_chunk)
                 current_chunk = file_diff
                 current_tokens = file_tokens
@@ -243,7 +220,7 @@ def chunk_diff(diff: str, max_tokens: int = MAX_TOKENS) -> List[str]:
                 current_tokens += file_tokens
 
     # Add the final chunk
-    if current_chunk:
+    if current_chunk.strip():
         chunks.append(current_chunk)
 
     return chunks
@@ -258,40 +235,27 @@ def create_commit_prompt(diff: str, context: str = "") -> List[Dict[str, str]]:
         context: Additional context
 
     Returns:
-        List of messages for the LLM
+        List of messages for the LLM, or raises ImportError if commitlint module not found.
     """
     # Calculate approximate token count for the diff
     diff_tokens = token_count(diff)
-    
+
     # Log token count if logging is enabled
     if not logger.disabled:
         logger.debug(f"Diff token count: {diff_tokens}")
-    
-    system_prompt = """You are a commit message generator. 
-Generate a concise, meaningful commit message following these guidelines:
-- Use the imperative mood ("Add feature" not "Added feature")
-- Start with a capital letter
-- Do not end with a period
-- Keep the first line under 50 characters
-- Be specific but concise
-- Focus on the "why" and "what" not just the "how"
-- If the changes involve multiple distinct changes, list them with bullet points
 
-Return ONLY the commit message without any additional explanation or formatting.
-"""
-
-    if context:
-        system_prompt += f"\nAdditional context from the user: {context}"
-
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {
-            "role": "user",
-            "content": f"Generate a commit message for the following changes:\n\n{diff}",
-        },
-    ]
-
-    return messages
+    # Use the commitlint prompts. If it fails, raise the error.
+    try:
+        # Ensure the import happens here to catch potential issues
+        from ..modules.commitlint.prompts import create_commit_prompt as create_commitlint_prompt_func
+        if not logger.disabled:
+            logger.debug("Using commitlint prompts for commit message generation")
+        return create_commitlint_prompt_func(diff, context)
+    except ImportError as e:
+        console.print("[bold red]Error:[/bold red] Failed to load commitlint prompt module.")
+        console.print("Please ensure the necessary modules are installed and accessible.")
+        logger.error(f"ImportError loading commitlint prompts: {e}")
+        raise e # Re-raise the error to stop execution
 
 
 def generate_commit_message(diff: str, context: str = "") -> str:
@@ -310,6 +274,17 @@ def generate_commit_message(diff: str, context: str = "") -> str:
         
     if not diff.strip():
         raise ValueError("No changes to commit. The diff is empty.")
+
+    # Get the list of staged files for better scoping
+    staged_files = get_staged_files()
+    if not logger.disabled:
+        logger.debug(f"Staged files: {staged_files}")
+    
+    # Add staged files to context if not already provided
+    if context and not any(file in context for file in staged_files):
+        context += f"\nFiles changed: {', '.join(staged_files)}"
+    elif not context:
+        context = f"Files changed: {', '.join(staged_files)}"
 
     # Split large diffs into manageable chunks
     diff_chunks = chunk_diff(diff)
@@ -349,7 +324,7 @@ def generate_commit_message(diff: str, context: str = "") -> str:
                         "model": MODEL_NAME,
                         "messages": prompt,
                         "temperature": 0.7,
-                        "max_tokens": 100,
+                        "max_tokens": MAX_OUTPUT_TOKENS, # Use increased token limit
                     }
 
                     if api_key:
@@ -427,17 +402,49 @@ def generate_commit_message(diff: str, context: str = "") -> str:
 
         # Combine messages
         combined = "\n\n".join(messages)
-        # Try to generate a summary if needed
-        if len(messages) > 1 and token_count(combined) < MAX_TOKENS // 2:
+        # Try to generate a summary if multiple chunks were processed
+        if len(messages) > 1:
+            console.print(f"[cyan]Generated {len(messages)} partial messages. Attempting to summarize...[/cyan]")
             try:
+                # Get the list of staged files for the summary context
+                staged_files = get_staged_files()
+                
+                # Import the file grouping function
+                try:
+                    from ..modules.commitlint.prompts import get_scope_for_files
+                    scope = get_scope_for_files(staged_files)
+                except ImportError:
+                    # Fallback if import fails
+                    scope = ", ".join(staged_files) if len(staged_files) <= 3 else "multiple-files"
+                
+                staged_files_str = ", ".join(staged_files)
+                
                 summary_prompt = [
                     {
                         "role": "system",
-                        "content": "You are a commit message summarizer. Create a concise summary of these individual commit messages, following the same style guidelines.",
+                        "content": f"""You are a commit message summarizer. Create a concise summary of these individual commit messages, following the conventional commit format.
+
+IMPORTANT: Your summary MUST follow the format: <type>(<scope>): <subject>
+
+The scope should reflect the area of the codebase being changed. The files changed in this commit are: {staged_files_str}
+
+Based on the files changed, the suggested scope is: '{scope}'.
+
+Examples of good summaries:
+- feat(auth): implement OAuth2 authentication
+- refactor(core): improve code organization and readability
+- fix(api): resolve validation issues
+- docs(guides): update installation instructions
+
+For multiple files with related changes, group them by functionality:
+- refactor(cli): update command structure and improve error handling
+- feat(core): add new data processing pipeline
+
+NEVER generate a commit message without a scope in parentheses.""",
                     },
                     {
                         "role": "user",
-                        "content": f"Summarize these related commit messages into one cohesive message:\n\n{combined}",
+                        "content": f"Summarize these related commit messages into one cohesive message following the conventional commit format with proper scopes:\n\n{combined}",
                     },
                 ]
     
@@ -446,7 +453,7 @@ def generate_commit_message(diff: str, context: str = "") -> str:
                     "model": MODEL_NAME,
                     "messages": summary_prompt,
                     "temperature": 0.7,
-                    "max_tokens": 100,
+                    "max_tokens": MAX_OUTPUT_TOKENS, # Use increased token limit for summary too
                 }
 
                 # Get API key from config
@@ -490,14 +497,21 @@ def generate_commit_message(diff: str, context: str = "") -> str:
     
                     logger.debug(f"Summary completion kwargs: {summary_completion_kwargs}")
                 response = litellm.completion(**summary_completion_kwargs)
-                return response.choices[0].message.content.strip()
-            except Exception:
+                summary_message = response.choices[0].message.content.strip()
+                console.print("[green]Successfully summarized commit message.[/green]")
+                return summary_message
+            except Exception as e:
                 # Fall back to the combined messages if summarization fails
-                pass
-        return combined
+                console.print(f"[yellow]Warning:[/yellow] Failed to summarize messages: {e}. Using combined messages.")
+                # Combine with double newline, maybe add a note?
+                return combined # Return the raw combined messages
+
+        # If only one message was generated (or summarization failed), return it
+        return messages[0] if messages else ""
+
 
     # For single chunks, generate directly
-    prompt = create_commit_prompt(diff_chunks[0], context)
+    prompt = create_commit_prompt(diff_chunks[0], context) # This now raises ImportError if module not found
     try:
         with Progress() as progress:
             task = progress.add_task(
@@ -518,7 +532,7 @@ def generate_commit_message(diff: str, context: str = "") -> str:
                 "model": MODEL_NAME,
                 "messages": prompt,
                 "temperature": 0.7,
-                "max_tokens": 100,
+                "max_tokens": MAX_OUTPUT_TOKENS, # Use increased token limit
             }
 
             if api_key:
@@ -803,7 +817,8 @@ def commit(
         # Display the generated message
         console.print(
             Panel(
-                message, title=get_text("commitMessageGenerated"), border_style="green"
+                message, title=get_text("commitMessageGenerated"), border_style="green", 
+                width=100  # Wider panel to show full commit messages
             )
         )
 

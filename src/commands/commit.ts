@@ -225,7 +225,7 @@ export async function commit(
     process.exit(1);
   }
 
-  intro('open-commit');
+  intro('pyoc - Python OpenCommit');
   if (errorChangedFiles ?? errorStagedFiles) {
     outro(`${chalk.red('✖')} ${errorChangedFiles ?? errorStagedFiles}`);
     process.exit(1);

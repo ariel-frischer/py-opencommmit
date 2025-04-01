@@ -1,0 +1,1 @@
+"""Commitlint integration for PyOC."""

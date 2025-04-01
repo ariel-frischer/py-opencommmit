@@ -52,7 +52,7 @@ dev = [
 ]
 
 [project.scripts]
-oco = "src.python.cli:main"
+pyoc = "src.python.cli:main"
 
 [tool.black]
 line-length = 88

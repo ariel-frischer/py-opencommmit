@@ -30,7 +30,7 @@ logger = logging.getLogger("opencommit")
     help="Set the logging level",
 )
 def cli(language, log_level):
-    """OpenCommit - AI-powered commit message generator."""
+    """PyOC - AI-powered commit message generator."""
     # Configure logging
     if log_level:
         numeric_level = getattr(logging, log_level)
