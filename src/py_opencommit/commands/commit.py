@@ -18,20 +18,20 @@ from rich.prompt import Confirm
 
 # Try to import commitlint prompts
 try:
-    from ..modules.commitlint.prompts import create_commit_prompt as create_commitlint_prompt
+    from py_opencommit.modules.commitlint.prompts import create_commit_prompt as create_commitlint_prompt
 except ImportError:
     create_commitlint_prompt = None
 
-from ..i18n import get_text
-from ..commands.config import get_config, ConfigKeys
+from py_opencommit.i18n import get_text
+from py_opencommit.commands.config import get_config, ConfigKeys
 
-from ..utils.git import (
+from py_opencommit.utils.git import (
     get_staged_diff,
     stage_all_changes,
     is_git_repository,
     stage_files,
 )
-from ..utils.token_count import token_count
+from py_opencommit.utils.token_count import token_count
 
 logger = logging.getLogger("opencommit")
 # Initialize rich console
@@ -64,7 +64,7 @@ def extract_file_names_from_diff(diff: str) -> List[str]:
     """
     # Import the function from the commitlint module if available
     try:
-        from ..modules.commitlint.prompts import extract_file_names_from_diff as extract_from_commitlint
+        from py_opencommit.modules.commitlint.prompts import extract_file_names_from_diff as extract_from_commitlint
         return extract_from_commitlint(diff)
     except ImportError:
         # Fallback implementation if the module is not available
@@ -284,7 +284,7 @@ def create_commit_prompt(diff: str, context: str = "") -> List[Dict[str, str]]:
     
     # Get appropriate scope for these files
     try:
-        from ..modules.commitlint.prompts import get_scope_for_files
+        from py_opencommit.modules.commitlint.prompts import get_scope_for_files
         scope = get_scope_for_files(file_names)
     except ImportError:
         # Simple fallback if import fails
@@ -295,7 +295,7 @@ def create_commit_prompt(diff: str, context: str = "") -> List[Dict[str, str]]:
     # Use the commitlint prompts. If it fails, raise the error.
     try:
         # Ensure the import happens here to catch potential issues
-        from ..modules.commitlint.prompts import create_commit_prompt as create_commitlint_prompt_func
+        from py_opencommit.modules.commitlint.prompts import create_commit_prompt as create_commitlint_prompt_func
         if not logger.disabled:
             logger.debug("Using commitlint prompts for commit message generation")
         return create_commitlint_prompt_func(diff, context)
@@ -781,7 +781,7 @@ def commit(
         staged_files = get_staged_files()
         unstaged_files = get_unstaged_files()
         # Import the new function
-        from ..utils.git import get_untracked_files
+        from py_opencommit.utils.git import get_untracked_files
         untracked_files = get_untracked_files()
 
         # Combine unstaged and untracked files

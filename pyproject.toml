@@ -52,11 +52,12 @@ dev = [
 ]
 
 [project.scripts]
-# Adjusted entry point to reflect package discovery within src
-pyoc = "python.cli:main"
+# Entry point now points to the renamed package
+pyoc = "py_opencommit.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]  # Look for packages in the src directory
+# No need for 'include' now, auto-discovery should work
 namespaces = false
 
 [tool.black]
