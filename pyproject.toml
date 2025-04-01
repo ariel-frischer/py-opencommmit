@@ -1,9 +1,9 @@
 [build-system]
-requires = ["uv>=0.5.9"]
-build-backend = "uv.build"
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
 
 [project]
-name = "opencommit"
+name = "py-opencommit"
 version = "0.1.0"
 description = "AI-powered commit message generator"
 authors = [
@@ -52,7 +52,12 @@ dev = [
 ]
 
 [project.scripts]
-pyoc = "src.python.cli:main"
+# Adjusted entry point to reflect package discovery within src
+pyoc = "python.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]  # Look for packages in the src directory
+namespaces = false
 
 [tool.black]
 line-length = 88

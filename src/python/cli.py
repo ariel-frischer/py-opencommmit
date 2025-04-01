@@ -10,7 +10,8 @@ import click
 import logging
 
 from rich.console import Console
-from src.python.i18n import get_text, load_translations, get_language_from_alias
+# Use relative imports within the package
+from .i18n import get_text, load_translations, get_language_from_alias
 
 # Filter out Pydantic warnings
 warnings.filterwarnings("ignore", message="Valid config keys have changed in V2")
@@ -82,7 +83,8 @@ def commit(stage_all, skip_confirm, context, log_level, extra_args):
         logger.disabled = False
     try:
         # Import here to avoid circular imports
-        from src.python.commands.commit import commit as run_commit
+        # Use relative import
+        from .commands.commit import commit as run_commit
 
         logger = logging.getLogger("opencommit")
 
@@ -166,7 +168,8 @@ def config(mode, key, project, log_level, value):
         logger.disabled = False
     try:
         # Import here to avoid circular imports
-        from src.python.commands.config import config as run_config
+        # Use relative import
+        from .commands.config import config as run_config
 
         run_config(mode, key, value, project)
     except Exception as e:
@@ -193,7 +196,8 @@ def githook(log_level):
         logger.disabled = False
     try:
         # Import here to avoid circular imports
-        from src.python.commands.githook import githook as run_githook
+        # Use relative import
+        from .commands.githook import githook as run_githook
 
         run_githook()
     except Exception as e:
@@ -205,7 +209,8 @@ def main():
     """Entry point for the CLI."""
     try:
         # Run migrations before starting the CLI
-        from src.python.migrations import run_migrations
+        # Use relative import
+        from .migrations import run_migrations
 
         run_migrations()
     except Exception as e:

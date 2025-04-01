@@ -5,7 +5,8 @@ import stat
 from pathlib import Path
 from rich.console import Console
 
-from src.python.utils.git import get_git_root
+# Use relative import
+from ..utils.git import get_git_root
 
 console = Console()
 
