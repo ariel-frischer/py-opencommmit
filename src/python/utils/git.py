@@ -119,6 +119,18 @@ def get_changed_files() -> List[str]:
     return sorted(list(all_files))
 
 
+def get_untracked_files() -> List[str]:
+    """
+    Get a list of untracked files.
+
+    Returns:
+        List of untracked file paths relative to repo root
+    """
+    # Use --exclude-standard to respect .gitignore
+    result = _run_git_command(["git", "ls-files", "--others", "--exclude-standard"])
+    return [f for f in result.stdout.strip().split("\n") if f]
+
+
 def get_staged_diff() -> str:
     """
     Get the diff of staged changes.

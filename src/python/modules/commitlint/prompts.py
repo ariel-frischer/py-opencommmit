@@ -2,7 +2,8 @@
 
 import logging
 import os
-from typing import Dict, List, Any
+import json
+from typing import Dict, List, Any, Tuple, Optional, Union
 
 from ...commands.config import get_config, ConfigKeys
 from ...i18n import get_text
@@ -22,70 +23,229 @@ INIT_DIFF_PROMPT = {
     "content": "Here's the git diff output that needs a commit message:"
 }
 
-# Type descriptions for conventional commits
-TYPE_DESCRIPTIONS = {
-    "feat": "A new feature",
-    "fix": "A bug fix",
-    "docs": "Documentation only changes",
-    "style": "Changes that do not affect the meaning of the code (white-space, formatting, etc)",
-    "refactor": "A code change that neither fixes a bug nor adds a feature",
-    "perf": "A code change that improves performance",
-    "test": "Adding missing tests or correcting existing tests",
-    "build": "Changes that affect the build system or external dependencies",
-    "ci": "Changes to CI configuration files and scripts",
-    "chore": "Other changes that don't modify src or test files",
-    "revert": "Reverts a previous commit"
-}
+class CommitLintConfig:
+    """Class to handle commitlint configuration and rule processing."""
+    
+    def __init__(self, config_data: Dict[str, Any]):
+        """Initialize with configuration data."""
+        self.config = config_data
+        self.translation = self.get_translation(config_data.get("OCO_LANGUAGE", "en"))
+        
+        # Type descriptions for conventional commits
+        self.type_descriptions = {
+            "feat": "A new feature",
+            "fix": "A bug fix",
+            "docs": "Documentation only changes",
+            "style": "Changes that do not affect the meaning of the code (white-space, formatting, etc)",
+            "refactor": "A code change that neither fixes a bug nor adds a feature",
+            "perf": "A code change that improves performance",
+            "test": "Adding missing tests or correcting existing tests",
+            "build": "Changes that affect the build system or external dependencies",
+            "ci": "Changes to CI configuration files and scripts",
+            "chore": "Other changes that don't modify src or test files",
+            "revert": "Reverts a previous commit"
+        }
 
-# LLM-readable rule descriptions
-def get_llm_readable_rules(key: str, applicable: str, value: Any = None, prompt: Dict = None) -> str:
-    """Generate LLM-readable rule descriptions."""
+    def get_translation(self, language: str) -> Dict[str, str]:
+        """Get translation for the specified language."""
+        translations = {
+            "en": {"localLanguage": "English"},
+            # Add other language mappings as needed
+        }
+        return translations.get(language, translations["en"])
+
+    def get_type_rule_extra_description(self, type_value: str, prompt: Dict[str, Any]) -> Optional[str]:
+        """Get extra description for a type rule."""
+        return (prompt.get("questions", {})
+                .get("type", {})
+                .get("enum", {})
+                .get(type_value, {})
+                .get("description"))
+
+    def llm_readable_rules(self) -> Dict[str, callable]:
+        """Get dictionary of functions to generate LLM-readable rules."""
+        return {
+            "blankline": lambda key, applicable, *_: 
+                f"There should {applicable} be a blank line at the beginning of the {key}.",
+                
+            "caseRule": lambda key, applicable, value, *_: 
+                f"The {key} should {applicable} be in {self._format_case_value(value)} case.",
+                
+            "emptyRule": lambda key, applicable, *_: 
+                f"The {key} should {applicable} be empty.",
+                
+            "enumRule": lambda key, applicable, value, *_: 
+                f"The {key} should {applicable} be one of the following values:\n  - " + 
+                "\n  - ".join(value) if isinstance(value, list) else 
+                f"The {key} should {applicable} be one of the following values: {value}",
+                
+            "enumTypeRule": lambda key, applicable, value, prompt: 
+                f"The {key} should {applicable} be one of the following values:\n  - " + 
+                "\n  - ".join([f"{v} ({self.get_type_rule_extra_description(v, prompt) or self.type_descriptions.get(v, '')})" 
+                              if (self.get_type_rule_extra_description(v, prompt) or self.type_descriptions.get(v, '')) 
+                              else v 
+                              for v in value]) if isinstance(value, list) else 
+                f"The {key} should {applicable} be one of the following values: {value}",
+                
+            "fullStopRule": lambda key, applicable, value, *_: 
+                f"The {key} should {applicable} end with '{value}'.",
+                
+            "maxLengthRule": lambda key, applicable, value, *_: 
+                f"The {key} should {applicable} have {value} characters or less.",
+                
+            "minLengthRule": lambda key, applicable, value, *_: 
+                f"The {key} should {applicable} have {value} characters or more.",
+        }
     
-    # Case rule
-    if key.endswith("-case"):
-        return f"The {key.split('-')[0]} should {applicable} be in {value if isinstance(value, str) else ', '.join(value) if isinstance(value, list) else 'proper'} case."
-    
-    # Empty rule
-    elif key.endswith("-empty"):
-        return f"The {key.split('-')[0]} should {applicable} be empty."
-    
-    # Blank line rule
-    elif key.endswith("-leading-blank"):
-        return f"There should {applicable} be a blank line at the beginning of the {key.split('-')[0]}."
-    
-    # Max length rule
-    elif key.endswith("-max-length"):
-        return f"The {key.split('-')[0]} should {applicable} have {value} characters or less."
-    
-    # Min length rule
-    elif key.endswith("-min-length"):
-        return f"The {key.split('-')[0]} should {applicable} have {value} characters or more."
-    
-    # Full stop rule
-    elif key.endswith("-full-stop"):
-        return f"The {key.split('-')[0]} should {applicable} end with '{value}'."
-    
-    # Enum rule for types
-    elif key == "type-enum":
+    def _format_case_value(self, value: Union[str, List[str]]) -> str:
+        """Format case value for display in rules."""
         if isinstance(value, list):
-            type_items = []
-            for v in value:
-                description = TYPE_DESCRIPTIONS.get(v, "")
-                if description:
-                    type_items.append(f"{v} ({description})")
-                else:
-                    type_items.append(v)
-            return f"The type should {applicable} be one of the following values:\n  - " + "\n  - ".join(type_items)
-        return f"The type should {applicable} be one of the following values: {value}"
-    
-    # Enum rule for other fields
-    elif key.endswith("-enum"):
-        if isinstance(value, list):
-            return f"The {key.split('-')[0]} should {applicable} be one of the following values:\n  - " + "\n  - ".join(value)
-        return f"The {key.split('-')[0]} should {applicable} be one of the following values: {value}"
-    
-    # Default case
-    return f"The {key} should {applicable} follow the rule with value: {value}"
+            return "one of the following cases: " + ", ".join(value)
+        return f"{value}"
+
+    def rules_prompts(self) -> Dict[str, callable]:
+        """Get dictionary of functions to generate rule prompts."""
+        readable_rules = self.llm_readable_rules()
+        
+        return {
+            "body-case": lambda applicable, value, prompt=None: 
+                readable_rules["caseRule"]("body", applicable, value),
+                
+            "body-empty": lambda applicable, *_: 
+                readable_rules["emptyRule"]("body", applicable),
+                
+            "body-full-stop": lambda applicable, value, *_: 
+                readable_rules["fullStopRule"]("body", applicable, value),
+                
+            "body-leading-blank": lambda applicable, *_: 
+                readable_rules["blankline"]("body", applicable),
+                
+            "body-max-length": lambda applicable, value, *_: 
+                readable_rules["maxLengthRule"]("body", applicable, value),
+                
+            "body-max-line-length": lambda applicable, value, *_: 
+                f"Each line of the body should {applicable} have {value} characters or less.",
+                
+            "body-min-length": lambda applicable, value, *_: 
+                readable_rules["minLengthRule"]("body", applicable, value),
+                
+            "footer-case": lambda applicable, value, *_: 
+                readable_rules["caseRule"]("footer", applicable, value),
+                
+            "footer-empty": lambda applicable, *_: 
+                readable_rules["emptyRule"]("footer", applicable),
+                
+            "footer-leading-blank": lambda applicable, *_: 
+                readable_rules["blankline"]("footer", applicable),
+                
+            "footer-max-length": lambda applicable, value, *_: 
+                readable_rules["maxLengthRule"]("footer", applicable, value),
+                
+            "footer-max-line-length": lambda applicable, value, *_: 
+                f"Each line of the footer should {applicable} have {value} characters or less.",
+                
+            "footer-min-length": lambda applicable, value, *_: 
+                readable_rules["minLengthRule"]("footer", applicable, value),
+                
+            "header-case": lambda applicable, value, *_: 
+                readable_rules["caseRule"]("header", applicable, value),
+                
+            "header-full-stop": lambda applicable, value, *_: 
+                readable_rules["fullStopRule"]("header", applicable, value),
+                
+            "header-max-length": lambda applicable, value, *_: 
+                readable_rules["maxLengthRule"]("header", applicable, value),
+                
+            "header-min-length": lambda applicable, value, *_: 
+                readable_rules["minLengthRule"]("header", applicable, value),
+                
+            "references-empty": lambda applicable, *_: 
+                readable_rules["emptyRule"]("references section", applicable),
+                
+            "scope-case": lambda applicable, value, *_: 
+                readable_rules["caseRule"]("scope", applicable, value),
+                
+            "scope-empty": lambda applicable, *_: 
+                readable_rules["emptyRule"]("scope", applicable),
+                
+            "scope-enum": lambda applicable, value, *_: 
+                readable_rules["enumRule"]("scope", applicable, value),
+                
+            "scope-max-length": lambda applicable, value, *_: 
+                readable_rules["maxLengthRule"]("scope", applicable, value),
+                
+            "scope-min-length": lambda applicable, value, *_: 
+                readable_rules["minLengthRule"]("scope", applicable, value),
+                
+            "signed-off-by": lambda applicable, value, *_: 
+                f"The commit message should {applicable} have a \"Signed-off-by\" line with the value \"{value}\".",
+                
+            "subject-case": lambda applicable, value, *_: 
+                readable_rules["caseRule"]("subject", applicable, value),
+                
+            "subject-empty": lambda applicable, *_: 
+                readable_rules["emptyRule"]("subject", applicable),
+                
+            "subject-full-stop": lambda applicable, value, *_: 
+                readable_rules["fullStopRule"]("subject", applicable, value),
+                
+            "subject-max-length": lambda applicable, value, *_: 
+                readable_rules["maxLengthRule"]("subject", applicable, value),
+                
+            "subject-min-length": lambda applicable, value, *_: 
+                readable_rules["minLengthRule"]("subject", applicable, value),
+                
+            "type-case": lambda applicable, value, *_: 
+                readable_rules["caseRule"]("type", applicable, value),
+                
+            "type-empty": lambda applicable, *_: 
+                readable_rules["emptyRule"]("type", applicable),
+                
+            "type-enum": lambda applicable, value, prompt=None: 
+                readable_rules["enumTypeRule"]("type", applicable, value, prompt),
+                
+            "type-max-length": lambda applicable, value, *_: 
+                readable_rules["maxLengthRule"]("type", applicable, value),
+                
+            "type-min-length": lambda applicable, value, *_: 
+                readable_rules["minLengthRule"]("type", applicable, value),
+        }
+
+    def get_prompt(self, rule_name: str, rule_config_tuple: Tuple, prompt: Dict[str, Any]) -> Optional[str]:
+        """Get prompt for a rule."""
+        severity, applicable, value = rule_config_tuple
+        
+        # Skip disabled rules
+        if severity == 0:  # RuleConfigSeverity.Disabled
+            return None
+
+        prompt_fn = self.rules_prompts().get(rule_name)
+        if prompt_fn:
+            return prompt_fn(applicable, value, prompt)
+        
+        # Handle custom rules or missing handlers
+        if not logger.disabled:
+            logger.warning(f"No prompt handler for rule '{rule_name}'.")
+        return f"The {rule_name} should {applicable} follow the rule with value: {value}"
+
+    def infer_prompts_from_commitlint_config(self, commitlint_config: Dict[str, Any]) -> List[str]:
+        """Infer prompts from commitlint configuration."""
+        rules = commitlint_config.get("rules", {})
+        prompt_config = commitlint_config.get("prompt", {})
+        
+        if not logger.disabled:
+            logger.debug(f"Processing {len(rules)} commitlint rules")
+            
+        prompts = []
+        for rule_name, rule_config in rules.items():
+            inferred_prompt = self.get_prompt(rule_name, rule_config, prompt_config)
+            if inferred_prompt:
+                prompts.append(inferred_prompt)
+                
+        return prompts
+
+# Initialize CommitLintConfig with the current configuration
+commitlint_config = CommitLintConfig(config)
 
 
 def create_commit_prompt(diff: str, context: str = "") -> List[Dict[str, str]]:
@@ -108,9 +268,8 @@ def create_commit_prompt(diff: str, context: str = "") -> List[Dict[str, str]]:
     
     # Extract file names from diff
     file_names = extract_file_names_from_diff(diff)
-    
-    # Get appropriate scope for these files
-    scope = get_scope_for_files(file_names)
+    if not logger.disabled:
+        logger.debug(f"File names from diff: {file_names}")
     
     # For display in the prompt
     file_names_str = ", ".join(file_names) if file_names else "unknown"
@@ -161,11 +320,12 @@ def create_commit_prompt(diff: str, context: str = "") -> List[Dict[str, str]]:
     else:
         system_content += "ALWAYS include a scope in the commit message format. Use the format: <type>(<scope>): <subject>\n"
         system_content += f"The files changed in this commit are: {file_names_str}.\n"
-        system_content += f"Based on the files changed, the suggested scope is: '{scope}'. Use this suggested scope or a more specific one if appropriate.\n"
-        
-        if len(file_names) > 3:
-            system_content += "When multiple files are changed, group them by functionality (e.g., 'cli', 'config', 'docs', 'auth', 'api') rather than listing all filenames.\n"
-        
+
+        # More direct instructions for scope determination using filenames
+        system_content += "The scope MUST contain the filename(s) changed for that specific commit line.\n"
+        system_content += "If a commit line addresses changes in multiple files, list them comma-separated in the scope (e.g., `file1.py, file2.ts`).\n"
+        system_content += "If a single file is changed, use just that filename (e.g., `main.py`).\n"
+
         structure_of_commit = (
             "- Header: <type>(<scope>): <subject>\n"
             "- Body/Footer (Optional): <description>"
@@ -192,29 +352,29 @@ IMPORTANT: If the provided diff contains multiple distinct logical changes (e.g.
 
 Examples (assuming OCO_OMIT_SCOPE=false):
 
-Single Change:
+Single Change (Single File):
 ```
-feat(auth): implement OAuth2 authentication flow
+feat(auth.py): implement OAuth2 authentication flow
 
 Add OAuth2 authentication support with Google and GitHub providers.
 This improves security by using industry-standard protocols and allows users
 to log in with existing accounts, reducing onboarding friction.
 ```
 
-Multiple Distinct Changes (Example):
+Multiple Distinct Changes (Multiple Files):
 ```
-refactor(auth, user): simplify login logic and database schema
+refactor(auth.py, user.py): simplify login logic and database schema
 
 Streamline the authentication process and update user table structure for clarity.
 
-feat(profile): add user profile editing feature
+feat(profile.html): add user profile editing feature
 
 Allow users to update their display name and profile picture.
 ```
 
-NEVER generate a commit message {'with a scope in parentheses' if omit_scope else 'without a scope in parentheses'}. The scope should be meaningful and reflect the changed files/components for that specific line item.
+NEVER generate a commit message {'with a scope in parentheses' if omit_scope else 'without a scope in parentheses containing the relevant filename(s)'}. The scope MUST contain the filename(s) affected by the change described in that line.
 """
-    
+
     if context:
         system_content += f"\nAdditional context from the user: {context}"
     
@@ -239,116 +399,43 @@ def extract_file_names_from_diff(diff: str) -> List[str]:
     """
     import re
     
-    # Pattern to match file names in git diff
-    pattern = r"diff --git a/(.*?) b/(.*?)$"
+    # Pattern to match file names in git diff - use word boundary to avoid capturing quotes
+    pattern = r"diff --git a/(.*?) b/(.*?)(?:\s|$)"
     
     # Find all matches
     matches = re.findall(pattern, diff, re.MULTILINE)
     
     # Extract the 'b' file names (current version)
-    file_names = [match[1] for match in matches if match[1]]
+    file_names = []
+    for match in matches:
+        if match[1]:
+            # Remove any trailing whitespace or special characters
+            clean_name = match[1].strip()
+            # Skip any entries that look like regex patterns (containing special chars)
+            if any(c in clean_name for c in '*?()[]{}^$+\\'):
+                continue
+            file_names.append(clean_name)
+    
+    # Debug output
+    if logger and not logger.disabled:
+        logger.debug(f"Extracted file names: {file_names}")
     
     return file_names
 
 
-def group_files_by_type(files: List[str]) -> Dict[str, List[str]]:
+def infer_prompts_from_commitlint_config(config_data: Dict[str, Any]) -> List[str]:
     """
-    Group files by their type/purpose to create meaningful scopes.
+    Infer prompts from commitlint configuration.
     
     Args:
-        files: List of file paths
+        config_data: Commitlint configuration data
         
     Returns:
-        Dictionary mapping scope names to lists of files
+        List of prompt strings
     """
-    # Initialize groups
-    groups = {
-        "docs": [],
-        "config": [],
-        "cli": [],
-        "core": [],
-        "utils": [],
-        "commands": [],
-        "modules": [],
-        "tests": [],
-    }
-    
-    for file in files:
-        # Documentation files
-        if file.endswith(('.md', '.rst', '.txt')) or 'docs/' in file or 'README' in file:
-            groups["docs"].append(file)
-        
-        # Configuration files
-        elif file.endswith(('.toml', '.json', '.yaml', '.yml', '.ini')) or 'config' in file:
-            groups["config"].append(file)
-        
-        # CLI files
-        elif 'cli.py' in file or 'cli/' in file:
-            groups["cli"].append(file)
-        
-        # Command files
-        elif 'commands/' in file or 'cmd/' in file:
-            groups["commands"].append(file)
-        
-        # Module files
-        elif 'modules/' in file:
-            groups["modules"].append(file)
-        
-        # Test files
-        elif 'test' in file or 'tests/' in file:
-            groups["tests"].append(file)
-        
-        # Utility files
-        elif 'utils/' in file or 'util/' in file or 'helpers/' in file:
-            groups["utils"].append(file)
-        
-        # Core files (everything else)
-        else:
-            groups["core"].append(file)
-    
-    # Remove empty groups
-    return {k: v for k, v in groups.items() if v}
-
-
-def get_scope_for_files(files: List[str]) -> str:
-    """
-    Generate an appropriate scope string for the given files.
-    
-    Args:
-        files: List of file paths
-        
-    Returns:
-        Scope string for commit message
-    """
-    if not files:
-        return "unknown"
-    
-    # If only one file, use its name (or relevant part) as scope
-    if len(files) == 1:
-        # Optionally clean up the filename (e.g., remove path)
-        # For now, return the full path as provided
-        return files[0]
-
-    # If 2-3 files, list them all
-    elif len(files) <= 3:
-        return ", ".join(files)
-    
-    # For more files, try to group them
-    groups = group_files_by_type(files)
-    
-    # If all files are in the same group, use that group name
-    if len(groups) == 1:
-        group_name, group_files = next(iter(groups.items()))
-        
-        # If the group has a clear common directory, use that
-        common_prefix = os.path.commonprefix(group_files)
-        if common_prefix and '/' in common_prefix:
-            return common_prefix.rstrip('/')
-        
-        return group_name
-    
-    # If multiple groups, list the group names
-    return ", ".join(groups.keys())
+    # Use the CommitLintConfig class to process the config
+    config_processor = CommitLintConfig(config)
+    return config_processor.infer_prompts_from_commitlint_config(config_data)
 
 
 def create_consistency_prompt(prompts: List[str]) -> List[Dict[str, str]]:

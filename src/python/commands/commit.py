@@ -52,6 +52,41 @@ DEFAULT_TEMPLATE_PLACEHOLDER = config.get(
 )
 
 
+def extract_file_names_from_diff(diff: str) -> List[str]:
+    """
+    Extract file names from a git diff.
+    
+    Args:
+        diff: Git diff string
+        
+    Returns:
+        List of file names
+    """
+    # Import the function from the commitlint module if available
+    try:
+        from ..modules.commitlint.prompts import extract_file_names_from_diff as extract_from_commitlint
+        return extract_from_commitlint(diff)
+    except ImportError:
+        # Fallback implementation if the module is not available
+        import re
+        
+        # Pattern to match file names in git diff
+        pattern = r"diff --git a/(.*?) b/(.*?)$"
+        
+        # Find all matches
+        matches = re.findall(pattern, diff, re.MULTILINE)
+        
+        # Extract the 'b' file names (current version)
+        file_names = []
+        for match in matches:
+            if match[1]:
+                # Remove any trailing whitespace or special characters
+                clean_name = match[1].strip()
+                file_names.append(clean_name)
+        
+        return file_names
+
+
 def get_staged_files() -> List[str]:
     """
     Get a list of staged files.
@@ -243,7 +278,20 @@ def create_commit_prompt(diff: str, context: str = "") -> List[Dict[str, str]]:
     # Log token count if logging is enabled
     if not logger.disabled:
         logger.debug(f"Diff token count: {diff_tokens}")
-
+    
+    # Extract file names from diff for better scoping
+    file_names = extract_file_names_from_diff(diff)
+    
+    # Get appropriate scope for these files
+    try:
+        from ..modules.commitlint.prompts import get_scope_for_files
+        scope = get_scope_for_files(file_names)
+    except ImportError:
+        # Simple fallback if import fails
+        scope = "unknown"
+        if len(file_names) <= 3:
+            scope = ", ".join(file_names)
+    
     # Use the commitlint prompts. If it fails, raise the error.
     try:
         # Ensure the import happens here to catch potential issues
@@ -409,14 +457,7 @@ def generate_commit_message(diff: str, context: str = "") -> str:
                 # Get the list of staged files for the summary context
                 staged_files = get_staged_files()
                 
-                # Import the file grouping function
-                try:
-                    from ..modules.commitlint.prompts import get_scope_for_files
-                    scope = get_scope_for_files(staged_files)
-                except ImportError:
-                    # Fallback if import fails
-                    scope = ", ".join(staged_files) if len(staged_files) <= 3 else "multiple-files"
-                
+                # Just use the list of files directly
                 staged_files_str = ", ".join(staged_files)
                 
                 summary_prompt = [
@@ -426,21 +467,22 @@ def generate_commit_message(diff: str, context: str = "") -> str:
 
 IMPORTANT: Your summary MUST follow the format: <type>(<scope>): <subject>
 
-The scope should reflect the area of the codebase being changed. The files changed in this commit are: {staged_files_str}
+The scope MUST contain the primary filename(s) relevant to the summarized changes.
+If the summary covers changes in multiple files, list the most relevant ones comma-separated in the scope (e.g., `file1.py, file2.ts`). Limit to 2-3 key files if many were changed.
+If the summary primarily concerns one file, use that filename (e.g., `main.py`).
+The full list of files changed in this commit is: {staged_files_str}
 
-Based on the files changed, the suggested scope is: '{scope}'.
+Examples of good summaries with filename scopes:
+- feat(auth.py): implement OAuth2 authentication
+- refactor(utils.py): improve code organization and readability
+- fix(api_handler.ts): resolve validation issues
+- docs(README.md): update installation instructions
 
-Examples of good summaries:
-- feat(auth): implement OAuth2 authentication
-- refactor(core): improve code organization and readability
-- fix(api): resolve validation issues
-- docs(guides): update installation instructions
+For multiple files with related changes, use comma-separated filenames:
+- refactor(cli.py, config.py): update command structure and improve error handling
+- feat(data_processor.py, pipeline.py): add new data processing pipeline
 
-For multiple files with related changes, group them by functionality:
-- refactor(cli): update command structure and improve error handling
-- feat(core): add new data processing pipeline
-
-NEVER generate a commit message without a scope in parentheses.""",
+NEVER generate a commit message without a scope in parentheses containing relevant filename(s).""",
                     },
                     {
                         "role": "user",
@@ -734,22 +776,30 @@ def commit(
 
         # Get the diff of staged changes
         diff = get_staged_diff()
-        
-        # Get staged and changed files
+
+        # Get staged, unstaged, and untracked files
         staged_files = get_staged_files()
         unstaged_files = get_unstaged_files()
-            
-        # If no staged files but we have unstaged changes
-        if not staged_files and unstaged_files:
+        # Import the new function
+        from ..utils.git import get_untracked_files
+        untracked_files = get_untracked_files()
+
+        # Combine unstaged and untracked files
+        changes_not_staged = sorted(list(set(unstaged_files + untracked_files)))
+
+        # If no staged files but we have unstaged or untracked changes
+        if not staged_files and changes_not_staged:
             console.print("[yellow]No files are staged[/yellow]")
-            
-            # Show list of changed files
-            console.print("[cyan]Changed files:[/cyan]")
-            for file in unstaged_files:
-                console.print(f"  - {file}")
-            
+
+            # Show list of changed and untracked files
+            console.print("[cyan]Changes not staged for commit:[/cyan]")
+            for file in changes_not_staged:
+                # Add a marker for untracked files
+                marker = "[bright_magenta](untracked)[/bright_magenta]" if file in untracked_files else ""
+                console.print(f"  - {file} {marker}")
+
             # Ask if user wants to stage all files
-            if Confirm.ask("Do you want to stage all files and generate commit message?"):
+            if Confirm.ask("Do you want to stage all changes (modified and untracked) and generate commit message?"):
                 console.print("Staging all changes...")
                 stage_all_changes()
                 # Get the diff again after staging
@@ -757,21 +807,22 @@ def commit(
                 staged_files = get_staged_files()
             else:
                 # Let user select specific files to stage
-                if len(unstaged_files) > 0:
+                if len(changes_not_staged) > 0:
                     from rich.prompt import Prompt
-                    
+
                     console.print(f"[cyan]Select the files you want to add to the commit:[/cyan]")
-                    for i, file in enumerate(unstaged_files):
-                        console.print(f"  {i+1}. {file}")
-                    
-                    selected = Prompt.ask("Enter file numbers (comma-separated, or 'all' for all files)")
-                    
+                    for i, file in enumerate(changes_not_staged):
+                        marker = "[bright_magenta](untracked)[/bright_magenta]" if file in untracked_files else ""
+                        console.print(f"  {i+1}. {file} {marker}")
+
+                    selected = Prompt.ask("Enter file numbers (comma-separated, or 'all' for all changes)")
+
                     if selected.lower() == 'all':
-                        files_to_stage = unstaged_files
+                        files_to_stage = changes_not_staged
                     else:
                         try:
                             indices = [int(idx.strip()) - 1 for idx in selected.split(',')]
-                            files_to_stage = [unstaged_files[i] for i in indices if 0 <= i < len(unstaged_files)]
+                            files_to_stage = [changes_not_staged[i] for i in indices if 0 <= i < len(changes_not_staged)]
                         except (ValueError, IndexError):
                             console.print("[bold red]Invalid selection. No files staged.[/bold red]")
                             sys.exit(1)
