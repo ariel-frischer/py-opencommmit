@@ -149,6 +149,12 @@ def split_diff_by_files(diff: str) -> Dict[str, str]:
             match = re.search(r"diff --git a/(.*) b/(.*)", line)
             if match:
                 current_file = match.group(2)
+                                # Check if file should be excluded
+                if any(excluded in current_file for excluded in EXCLUDED_FILES):
+                    current_file = None # Skip this file
+                    current_diff = []
+                    continue
+
                 current_diff = [line]
         elif current_file:
             current_diff.append(line)
@@ -325,14 +331,19 @@ def generate_commit_message(diff: str, context: str = "") -> str:
 
     # Get the list of staged files for better scoping
     staged_files = get_staged_files()
+
+    # Filter out excluded files from staged_files
+    filtered_staged_files = [f for f in staged_files if not any(excluded in f for excluded in EXCLUDED_FILES)]
+
     if not logger.disabled:
         logger.debug(f"Staged files: {staged_files}")
+        logger.debug(f"Filtered staged files: {filtered_staged_files}")
     
     # Add staged files to context if not already provided
-    if context and not any(file in context for file in staged_files):
-        context += f"\nFiles changed: {', '.join(staged_files)}"
+    if context and not any(file in context for file in filtered_staged_files):
+        context += f"\nFiles changed: {', '.join(filtered_staged_files)}"
     elif not context:
-        context = f"Files changed: {', '.join(staged_files)}"
+        context = f"Files changed: {', '.join(filtered_staged_files)}"
 
     # Split large diffs into manageable chunks
     diff_chunks = chunk_diff(diff)
@@ -900,5 +911,14 @@ def commit(
         sys.exit(1)
 
 
-if __name__ == "__main__":
-    commit()
+EXCLUDED_FILES = [
+    ".lock",
+    "package-lock.json",
+    "yarn.lock",
+    "Pipfile.lock",
+    ".pyc",
+    ".class",
+    ".wasm",
+]
+
+EXCLUDED_FILES = EXCLUDED_FILES

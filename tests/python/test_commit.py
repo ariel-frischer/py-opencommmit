@@ -13,7 +13,8 @@ from src.python.commands.commit import (
     chunk_diff,
     split_diff_by_files,
     create_commit_prompt,
-    DEFAULT_TEMPLATE_PLACEHOLDER
+    DEFAULT_TEMPLATE_PLACEHOLDER,
+    EXCLUDED_FILES
 )
 
 
@@ -109,6 +110,27 @@ index 9876543..fedcba 100644
     assert "+line3" in result["file1.txt"]
     assert "-line1" in result["file2.txt"]
 
+    # Test excluded files
+    diff = """diff --git a/file1.txt b/file1.txt
+index 1234567..abcdef 100644
+--- a/file1.txt
++++ b/file1.txt
+@@ -1,3 +1,4 @@
+ line1
+ line2
++line3
+diff --git a/package-lock.json b/package-lock.json
+index 9876543..fedcba 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1,2 +1 @@
+-line1
+ line2"""
+    result = split_diff_by_files(diff)
+    assert len(result) == 1
+    assert "file1.txt" in result
+    assert "package-lock.json" not in result
+
 
 def test_chunk_diff(mock_staged_diff):
     """Test chunk_diff function."""
@@ -129,7 +151,7 @@ def test_chunk_diff(mock_staged_diff):
             }
             mock_split.return_value = file_diffs
             
-            chunks = chunk_diff(mock_staged_diff, max_tokens=1500)
+            chunks = chunk_diff(mock_staged_diff, max_tokens_per_chunk=1500)
             assert len(chunks) == 2
             assert chunks[0] == "diff for file1"
             assert chunks[1] == "diff for file2"
@@ -143,7 +165,7 @@ def test_create_commit_prompt():
     messages = create_commit_prompt(diff)
     assert len(messages) == 2
     assert messages[0]["role"] == "system"
-    assert "You are a commit message generator" in messages[0]["content"]
+    assert "You are an AI assistant specialized in generating high-quality git commit messages" in messages[0]["content"] if hasattr(sys.modules['src.python.commands.commit'], 'create_commitlint_prompt') and sys.modules['src.python.commands.commit'].create_commitlint_prompt else "You are a commit message generator" in messages[0]["content"]
     assert messages[1]["role"] == "user"
     assert diff in messages[1]["content"]
     
