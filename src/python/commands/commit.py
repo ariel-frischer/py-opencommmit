@@ -6,7 +6,7 @@ Provides AI-generated commit messages using LiteLLM.
 import re
 import sys
 import logging
-from typing import List, Optional, Dict, Union
+from typing import List, Optional, Dict, Union, Tuple
 
 import click
 import litellm
@@ -30,6 +30,7 @@ from ..utils.git import (
     stage_all_changes,
     is_git_repository,
     stage_files,
+    should_filter_file,
 )
 from ..utils.token_count import token_count
 
@@ -126,24 +127,35 @@ def get_unstaged_files() -> List[str]:
         return []
 
 
-def split_diff_by_files(diff: str) -> Dict[str, str]:
+def split_diff_by_files(diff: str) -> Tuple[Dict[str, str], Dict[str, str]]:
     """
-    Split a git diff by individual files.
+    Split a git diff by individual files and filter out files that should be excluded from LLM processing.
 
     Args:
         diff: Full git diff
 
     Returns:
-        Dictionary mapping file paths to their diffs
+        Tuple containing:
+            - Dictionary mapping file paths to their diffs for inclusion in LLM processing
+            - Dictionary mapping file paths to their filtering reasons for excluded files
     """
-    file_diffs = {}
+    included_diffs = {}
+    filtered_diffs = {}
     current_file = None
     current_diff = []
 
     for line in diff.split("\n"):
         if line.startswith("diff --git"):
+            # Process previous file if exists
             if current_file and current_diff:
-                file_diffs[current_file] = "\n".join(current_diff)
+                file_diff = "\n".join(current_diff)
+                
+                # Check if file should be filtered
+                should_exclude, reason = should_filter_file(current_file)
+                if should_exclude:
+                    filtered_diffs[current_file] = reason
+                else:
+                    included_diffs[current_file] = file_diff
 
             # Extract filename from diff header
             match = re.search(r"diff --git a/(.*) b/(.*)", line)
@@ -153,11 +165,18 @@ def split_diff_by_files(diff: str) -> Dict[str, str]:
         elif current_file:
             current_diff.append(line)
 
-    # Add the last file
+    # Process the last file
     if current_file and current_diff:
-        file_diffs[current_file] = "\n".join(current_diff)
+        file_diff = "\n".join(current_diff)
+        
+        # Check if file should be filtered
+        should_exclude, reason = should_filter_file(current_file)
+        if should_exclude:
+            filtered_diffs[current_file] = reason
+        else:
+            included_diffs[current_file] = file_diff
 
-    return file_diffs
+    return included_diffs, filtered_diffs
 
 
 def chunk_diff(diff: str, max_tokens_per_chunk: int = MAX_INPUT_TOKENS_PER_CHUNK) -> List[str]:
@@ -184,12 +203,16 @@ def chunk_diff(diff: str, max_tokens_per_chunk: int = MAX_INPUT_TOKENS_PER_CHUNK
         logger.debug(f"Diff is {diff_tokens} tokens, exceeding chunk limit of {max_tokens_per_chunk}")
         logger.debug(f"Model context limit: {MODEL_CONTEXT_LIMIT}")
 
-    # Split by files first
-    file_diffs = split_diff_by_files(diff)
+    # Split by files first and filter out files we should exclude
+    file_diffs, filtered_files = split_diff_by_files(diff)
     chunks = []
     current_chunk = ""
     current_tokens = 0
 
+    # Log filtered files if any
+    if filtered_files:
+        logger.debug(f"Filtered {len(filtered_files)} files from LLM processing")
+        
     for file_path, file_diff in file_diffs.items():
         file_tokens = token_count(file_diff)
 
@@ -310,6 +333,9 @@ def generate_commit_message(diff: str, context: str = "") -> str:
     """
     Generate a commit message using LiteLLM.
     
+    Files are automatically filtered based on patterns and size constraints to optimize
+    the LLM processing, while still including all files in the actual commit.
+    
     Args:
         diff: Git diff
         context: Additional context
@@ -334,8 +360,20 @@ def generate_commit_message(diff: str, context: str = "") -> str:
     elif not context:
         context = f"Files changed: {', '.join(staged_files)}"
 
+    # Get both included and filtered files
+    file_diffs, filtered_files = split_diff_by_files(diff)
+    
+    # Log filtered files
+    if filtered_files:
+        console.print("\n[yellow]The following files were excluded from LLM processing (but will be included in the commit):[/yellow]")
+        for file_path, reason in filtered_files.items():
+            console.print(f"  - [yellow]{file_path}[/yellow] - {reason}")
+    
+    # Construct a diff with only the included files
+    included_diff = "\n".join(list(file_diffs.values()))
+    
     # Split large diffs into manageable chunks
-    diff_chunks = chunk_diff(diff)
+    diff_chunks = chunk_diff(included_diff if included_diff else diff)
     if not diff_chunks:
         raise ValueError("Failed to process the diff. Please check your changes.")
 

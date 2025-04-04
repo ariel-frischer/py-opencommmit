@@ -1,5 +1,21 @@
 # Python CLI Migration Plan
 
+## Smart File Filtering Feature
+
+The new Python CLI includes a smart file filtering system to improve LLM token efficiency and performance when generating commit messages. Key implementation details:
+
+1. **Default Patterns**: A comprehensive set of default patterns to exclude common binary, generated, and lock files
+2. **Size Thresholds**: Files larger than 1MB are automatically filtered from LLM processing
+3. **Custom Ignore Support**: Support for user-defined `.opencommitignore` files in the repository root
+4. **Seamless Integration**: Files are filtered from LLM processing but still included in the actual git commit
+
+### Implementation Notes
+
+- Implemented in `src/python/utils/git.py` using standard Python libraries
+- Uses `fnmatch` for glob pattern matching and handling directory wildcards
+- Tests in `tests/python/test_file_filtering.py` cover pattern matching, ignore file parsing, and file filtering logic
+- Documentation added to README.md with usage examples and explanations
+
 Your job is to create a mirror python repository in src/python that does most things this repository does.
 Do not remove any original js or ts files. For now we will just be editing python code in src/python/ directory.
 We have some work already converted but not all lets make sure the basics are working first.

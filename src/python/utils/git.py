@@ -4,12 +4,71 @@ import subprocess
 import os
 import platform
 import re
-from typing import List, Optional, Dict, Tuple
+import fnmatch
+from typing import List, Optional, Dict, Tuple, Set
 from pathlib import Path
 
 # Constants
 MAX_DIFF_SIZE = 50000  # Characters - when to split the diff
+MAX_FILE_SIZE = 1024 * 1024  # 1MB - files larger than this will be filtered
 GIT_ERROR_PATTERN = re.compile(r"^fatal:|^error:", re.MULTILINE)
+
+# File patterns that should be excluded from LLM processing
+DEFAULT_EXCLUDE_PATTERNS = [
+    # Lock files
+    "*.lock",
+    "*-lock.json",
+    "yarn.lock",
+    "package-lock.json",
+    "poetry.lock",
+    "Cargo.lock",
+    "Gemfile.lock",
+    "composer.lock",
+    
+    # Binary and large files
+    "*.wasm",
+    "*.min.js",
+    "*.min.css",
+    "*.gz",
+    "*.zip",
+    "*.tar",
+    "*.jar",
+    "*.war",
+    "*.ear",
+    "*.class",
+    "*.exe",
+    "*.dll",
+    "*.so",
+    "*.dylib",
+    "*.o",
+    "*.obj",
+    
+    # Images
+    "*.jpg",
+    "*.jpeg",
+    "*.png",
+    "*.gif",
+    "*.bmp",
+    "*.ico",
+    "*.svg",
+    "*.webp",
+    
+    # Generated files/directories
+    "dist/*",
+    "build/*",
+    "node_modules/*",
+    "__pycache__/*",
+    "*.pyc",
+    
+    # Other large files
+    "*.pdf",
+    "*.psd",
+    "*.ai",
+    "*.mp3",
+    "*.mp4",
+    "*.mov",
+    "*.avi"
+]
 
 
 class GitError(Exception):
@@ -405,3 +464,88 @@ def get_repo_status() -> Dict[str, bool]:
         "has_unstaged_changes": has_unstaged_changes(),
         "is_git_repo": get_git_root() is not None,
     }
+
+
+def get_opencommit_ignore() -> Set[str]:
+    """
+    Read the .opencommitignore file if it exists and return the patterns.
+    Similar to the JavaScript implementation.
+    
+    Returns:
+        Set of patterns to ignore
+    """
+    ignore_patterns = set(DEFAULT_EXCLUDE_PATTERNS)
+    
+    try:
+        ignore_file_path = Path('.opencommitignore')
+        if ignore_file_path.exists():
+            with open(ignore_file_path, 'r') as f:
+                # Read and add non-empty lines that don't start with #
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#'):
+                        ignore_patterns.add(line)
+    except Exception:
+        # Silently fail if the file can't be read, similar to JS implementation
+        pass
+    
+    return ignore_patterns
+
+
+def _matches_pattern(file_path: str, pattern: str) -> bool:
+    """
+    Check if file path matches a glob pattern using fnmatch.
+    Also handles directory paths with trailing /* patterns.
+    
+    Args:
+        file_path: Path to check
+        pattern: Glob pattern
+    
+    Returns:
+        True if the path matches the pattern
+    """
+    # Handle directory wildcards (e.g., "dist/*")
+    if pattern.endswith('/*'):
+        dir_pattern = pattern[:-2]
+        return file_path == dir_pattern or file_path.startswith(f"{dir_pattern}/")
+    
+    # Use fnmatch for standard glob pattern matching
+    return fnmatch.fnmatch(file_path, pattern)
+
+
+def should_filter_file(file_path: str) -> Tuple[bool, str]:
+    """
+    Determine if a file should be filtered (excluded) from LLM processing.
+    
+    Args:
+        file_path: Path to the file to check
+    
+    Returns:
+        Tuple of (should_filter: bool, reason: str)
+    """
+    # Check file existence
+    path = Path(file_path)
+    if not path.exists():
+        return False, "File doesn't exist"
+    
+    # Check file size
+    try:
+        if path.stat().st_size > MAX_FILE_SIZE:
+            return True, f"File exceeds size limit of {MAX_FILE_SIZE/1024/1024}MB"
+    except Exception:
+        # If we can't check size, assume it's ok
+        pass
+    
+    # Check against ignore patterns
+    ignore_patterns = get_opencommit_ignore()
+    
+    # Convert file path to forward slashes for consistent pattern matching
+    normalized_path = str(path).replace('\\', '/')
+    
+    for pattern in ignore_patterns:
+        # Use pattern matching
+        if _matches_pattern(normalized_path, pattern):
+            return True, f"Matches ignore pattern: {pattern}"
+    
+    # File passed all checks
+    return False, "File is not filtered"

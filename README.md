@@ -20,6 +20,11 @@ This repo is in BETA/experimental stage there are many issues, much of it was au
   - [Configuration File](#configuration-file)
   - [Environment Variables](#environment-variables)
 - [Differences from Node.js Version](#differences-from-nodejs-version)
+- [Smart File Filtering](#smart-file-filtering)
+  - [How File Filtering Works](#how-file-filtering-works)
+  - [Default Excluded Patterns](#default-excluded-patterns)
+  - [Customizing with .opencommitignore](#customizing-with-opencommitignore)
+  - [Examples](#examples)
 - [Troubleshooting](#troubleshooting)
 
 ## Installation
@@ -239,6 +244,93 @@ The Python CLI implementation aims to provide the same functionality as the Node
 4. **Package Management**: Uses UV instead of npm
 5. **Performance**: May have different performance characteristics
 
+## Smart File Filtering
+
+PyOC includes smart file filtering to prevent sending unnecessary or large files to the LLM when generating commit messages. This helps:
+
+- Reduce token usage and costs
+- Improve response times
+- Generate more relevant commit messages focused on actual code changes
+
+### How File Filtering Works
+
+When generating a commit message, PyOC automatically excludes:
+
+1. **Large files**: Any file larger than 1MB is filtered out
+2. **Common binary files**: Images, executables, compiled files, etc.
+3. **Lock files**: package-lock.json, yarn.lock, poetry.lock, etc.
+4. **Generated files**: Files in build/dist directories, minified code, etc.
+
+Files that are filtered are still included in your actual git commit, but their contents are not sent to the AI model for analysis.
+
+### Default Excluded Patterns
+
+PyOC filters these file patterns by default:
+
+```
+# Lock files
+*.lock, *-lock.json, yarn.lock, package-lock.json, poetry.lock, etc.
+
+# Binary and large files
+*.wasm, *.min.js, *.min.css, *.gz, *.zip, *.tar, etc.
+
+# Images
+*.jpg, *.jpeg, *.png, *.gif, *.svg, etc.
+
+# Generated files/directories
+dist/*, build/*, node_modules/*, __pycache__/*, etc.
+
+# Media files
+*.pdf, *.mp3, *.mp4, *.mov, etc.
+```
+
+### Customizing with .opencommitignore
+
+You can customize which files are filtered by creating a `.opencommitignore` file in your repository root. The syntax is similar to `.gitignore`:
+
+```
+# Example .opencommitignore file
+
+# Ignore custom file types
+*.generated.ts
+*.test.js
+
+# Ignore specific files
+large-schema.graphql
+api-spec.yaml
+
+# Ignore specific directories
+documentation/*
+```
+
+Each line specifies a pattern to ignore. Lines starting with `#` are comments.
+
+### Examples
+
+**Excluding test files from LLM analysis:**
+```
+# .opencommitignore
+*.test.js
+*.spec.js
+__tests__/*
+```
+
+**Excluding generated code:**
+```
+# .opencommitignore
+*.g.dart
+generated/*
+*.auto.cs
+```
+
+**Excluding large configuration files:**
+```
+# .opencommitignore
+*.config.json
+tsconfig.json
+webpack.config.js
+```
+
 ## Troubleshooting
 
 ### Common Issues
@@ -296,6 +388,17 @@ Error: Diff too large for token limit
 Solution: Commit changes in smaller batches or use a model with a larger context window:
 ```bash
 pyoc config --set model=gpt-4-turbo
+```
+
+You can also create a `.opencommitignore` file to exclude large, generated, or binary files from LLM processing:
+
+```bash
+# Create a basic .opencommitignore file
+echo "# Exclude large files and generated code
+dist/*
+build/*
+*.min.js
+*.wasm" > .opencommitignore
 ```
 
 #### Configuration Errors
