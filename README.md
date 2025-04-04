@@ -331,4 +331,5 @@ If you encounter issues not covered here, please:
 This repository was meant to be a python alternative to https://github.com/di-sukharev/opencommit
 We have tried to emulate its functionality from typescript to python.
 We have kept most of the original *.ts files for reference and for development if new features are added.
+Repobird bot added this!
 
