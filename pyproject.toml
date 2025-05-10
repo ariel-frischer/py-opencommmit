@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "py-opencommit"
-version = "0.1.0"
+version = "0.1.1"
 description = "AI-powered commit message generator"
 authors = [
     {name = "OpenCommit Team"}
@@ -53,12 +53,10 @@ dev = [
 ]
 
 [project.scripts]
-# Entry point now points to the renamed package
 pyoc = "py_opencommit.cli:main"
 
 [tool.setuptools.packages.find]
-where = ["src"]  # Look for packages in the src directory
-# No need for 'include' now, auto-discovery should work
+where = ["src"]
 namespaces = false
 
 [tool.black]
