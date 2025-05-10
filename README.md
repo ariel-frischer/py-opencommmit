@@ -32,7 +32,7 @@ I'm providing this mainly to folks that want a python fork for any reason - it m
 [pipx](https://pypa.github.io/pipx/) is the recommended installation method for CLI tools as it installs the package in an isolated environment but makes it available globally.
 
 ```bash
-pipx install pyoc
+pipx install py-opencommit
 ```
 
 ### Using pip
@@ -40,7 +40,7 @@ pipx install pyoc
 You can install PyOC using pip:
 
 ```bash
-pip install pyoc
+pip install py-opencommit
 ```
 
 ### Using UV
