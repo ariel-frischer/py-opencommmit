@@ -329,8 +329,8 @@ We have kept most of the original *.ts files for reference and for development i
 Why did I port this? I wanted a full python dependency chain for my application, not requiring node kept a slim docker runtime container.
 
 ## Roadmap
-- [ ] Remove older *.ts file references if they are not yet implelmented.
-- [ ] Impelement most of the other core functionality of original opencommit.
+- [ ] Remove older *.js file references if they are not yet implemented.
+- [ ] Implement most of the other core functionality of original opencommit.
 - [X] Commit command seems to work
 - [ ] Have not fully tested `config` command
 - [ ] Have not fully tested `githook` command
