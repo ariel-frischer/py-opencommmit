@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "AI-powered commit message generator"
 authors = [
     {name = "OpenCommit Team"}
+    {name = "Ariel Frischer"}
 ]
 readme = "README.md"
 requires-python = ">=3.10"

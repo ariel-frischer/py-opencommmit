@@ -43,19 +43,11 @@ You can install PyOC using pip:
 pip install py-opencommit
 ```
 
-### Using UV
-
-[UV](https://github.com/astral-sh/uv) is a fast Python package installer and resolver.
-
-```bash
-uv install pyoc
-```
-
 ### From Source
 
 ```bash
 git clone https://github.com/ariel-frischer/py-opencommit.git
-cd opencommit
+cd py-opencommit
 uv venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 uv install -e .
@@ -339,3 +331,6 @@ Why did I port this? I wanted a full python dependency chain for my application,
 ## Roadmap
 - [ ] Remove older *.ts file references if they are not yet implelmented.
 - [ ] Impelement most of the other core functionality of original opencommit.
+- [X] Commit command seems to work
+- [ ] Have not fully tested `config` command
+- [ ] Have not fully tested `githook` command
