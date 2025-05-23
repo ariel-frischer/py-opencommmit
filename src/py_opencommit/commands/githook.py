@@ -82,7 +82,8 @@ def githook():
             f.write(HOOK_CONTENT)
 
         # Set executable permissions
-        os.chmod(hook_path, stat.S_IEXEC | stat.S_IREAD | stat.S_IWRITE)
+        # Use explicit permission flags for better cross-platform compatibility
+        os.chmod(hook_path, os.stat(hook_path).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH | stat.S_IREAD | stat.S_IWRITE)
 
         console.print("[bold green]Success:[/bold green] Git hook installed successfully!")
         return True
