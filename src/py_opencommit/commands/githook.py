@@ -1,6 +1,7 @@
 import os
 import stat
 import sys
+import platform
 from pathlib import Path
 
 from py_opencommit.config import get_config
@@ -82,8 +83,14 @@ def githook():
             f.write(HOOK_CONTENT)
 
         # Set executable permissions
-        # Use explicit permission flags for better cross-platform compatibility
-        os.chmod(hook_path, os.stat(hook_path).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH | stat.S_IREAD | stat.S_IWRITE)
+        # Handle platform-specific permission settings
+        if platform.system() == 'Windows':
+            # On Windows, we need to ensure the file has the executable bit set
+            # S_IEXEC is a combination of S_IXUSR, S_IXGRP, S_IXOTH
+            os.chmod(hook_path, os.stat(hook_path).st_mode | stat.S_IEXEC | stat.S_IREAD | stat.S_IWRITE)
+        else:
+            # On Unix-like systems, set explicit executable permissions
+            os.chmod(hook_path, os.stat(hook_path).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH | stat.S_IREAD | stat.S_IWRITE)
 
         console.print("[bold green]Success:[/bold green] Git hook installed successfully!")
         return True

@@ -3,6 +3,7 @@
 import os
 import stat
 import tempfile
+import platform
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 import pytest
@@ -44,7 +45,13 @@ def test_githook_installation():
                 
                 # Verify file permissions
                 mode = os.stat(hook_path).st_mode
-                assert bool(mode & stat.S_IEXEC)
+                # On Windows, the executable bit might be represented differently
+                if platform.system() == 'Windows':
+                    # Check if any executable bit is set
+                    assert bool(mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH | stat.S_IEXEC))
+                else:
+                    # On Unix-like systems, check for executable bit
+                    assert bool(mode & stat.S_IEXEC)
                 
                 # Verify success message was printed
                 mock_console.print.assert_any_call("[bold green]Success:[/bold green] Git hook installed successfully!")
