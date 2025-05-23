@@ -83,7 +83,9 @@ def test_commit_command_error(runner):
             with mock.patch('py_opencommit.cli.get_language_from_alias', return_value=None):
                 result = runner.invoke(cli, ["commit"])
                 assert result.exit_code == 1
-                assert any("Error" in str(call) and "Test error" in str(call) for call in mock_print.call_args_list)
+                # Extract the actual messages from the call args
+                messages = [str(call.args[0]) for call in mock_print.call_args_list]
+                assert any("Error" in msg and "Test error" in msg for msg in messages)
 
 
 def test_config_get_command(runner):
@@ -126,7 +128,9 @@ def test_config_command_error(runner):
             with mock.patch('py_opencommit.cli.get_language_from_alias', return_value=None):
                 result = runner.invoke(cli, ["config", "get"])
                 assert result.exit_code == 1
-                assert any("Error" in str(call) and "Test error" in str(call) for call in mock_print.call_args_list)
+                # Extract the actual messages from the call args
+                messages = [str(call.args[0]) for call in mock_print.call_args_list]
+                assert any("Error" in msg and "Test error" in msg for msg in messages)
 
 
 def test_githook_command(runner):
@@ -144,7 +148,9 @@ def test_githook_command_error(runner):
             with mock.patch('py_opencommit.cli.get_language_from_alias', return_value=None):
                 result = runner.invoke(cli, ["githook"])
                 assert result.exit_code == 1
-                assert any("Error" in str(call) and "Test error" in str(call) for call in mock_print.call_args_list)
+                # Extract the actual messages from the call args
+                messages = [str(call.args[0]) for call in mock_print.call_args_list]
+                assert any("Error" in msg and "Test error" in msg for msg in messages)
 
 
 def test_main_function():

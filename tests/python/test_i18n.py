@@ -7,6 +7,9 @@ from py_opencommit.i18n import get_text, get_language_from_alias, load_translati
 
 def test_get_text_default_language():
     """Test getting text with default language."""
+    # Explicitly load English translations first
+    load_translations("en")
+    
     # This key should exist in the English translations
     assert get_text("localLanguage") == "english"
     
