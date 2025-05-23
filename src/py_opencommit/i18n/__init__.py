@@ -1,138 +1,79 @@
-"""
-Internationalization (i18n) module for OpenCommit CLI.
-"""
-
 import json
 import os
-from typing import Any, Dict, List, Optional
+from pathlib import Path
 
-# Default language
-DEFAULT_LANGUAGE = "en"
-
-# Path to the translations directory
-TRANSLATIONS_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# Dictionary to store loaded translations
-_translations: Dict[str, Dict[str, str]] = {}
-
-# List of supported languages
-supported_languages = [
-    "en",       # English
-    "cs",       # Czech
-    "de",       # German
-    "es_ES",    # Spanish
-    "fr",       # French
-    "id_ID",    # Bahasa Indonesia
-    "it",       # Italian
-    "ja",       # Japanese
-    "ko",       # Korean
-    "nl",       # Dutch
-    "pl",       # Polish
-    "pt_br",    # Portuguese (Brazil)
-    "ru",       # Russian
-    "sv",       # Swedish
-    "th",       # Thai
-    "tr",       # Turkish
-    "vi_VN",    # Vietnamese
-    "zh_CN",    # Chinese (Simplified)
-    "zh_TW",    # Chinese (Traditional)
-]
-
-# Language aliases for easier selection
-language_aliases = {
-    "en": ["en", "English", "english"],
-    "cs": ["cs", "Czech", "česky"],
-    "de": ["de", "German", "Deutsch"],
-    "es_ES": ["es_ES", "Spanish", "español"],
-    "fr": ["fr", "French", "française"],
-    "id_ID": ["id_ID", "Bahasa", "bahasa"],
-    "it": ["it", "Italian", "italiano"],
-    "ja": ["ja", "Japanese", "にほんご"],
-    "ko": ["ko", "Korean", "한국어"],
-    "nl": ["nl", "Dutch", "Nederlands"],
-    "pl": ["pl", "Polish", "Polski"],
-    "pt_br": ["pt_br", "Portuguese", "português"],
-    "ru": ["ru", "Russian", "русский"],
-    "sv": ["sv", "Swedish", "Svenska"],
-    "th": ["th", "Thai", "ไทย"],
-    "tr": ["tr", "Turkish", "Turkish"],
-    "vi_VN": ["vi_VN", "Vietnamese", "tiếng Việt"],
-    "zh_CN": ["zh_CN", "简体中文", "中文", "简体"],
-    "zh_TW": ["zh_TW", "繁體中文", "繁體"],
-}
+# Global variable to store translations
+_translations = {}
+_current_language = "en"
 
 
-def get_language_from_alias(alias: str) -> Optional[str]:
+def load_translations(language="en"):
     """
-    Get language code from an alias.
+    Load translations for the specified language.
+    """
+    global _translations, _current_language
     
-    Args:
-        alias: The alias to look up
-        
-    Returns:
-        The language code if found, None otherwise
-    """
-    for lang, aliases in language_aliases.items():
-        if alias in aliases:
-            return lang
-    return None
-
-
-def load_translations(language: str = DEFAULT_LANGUAGE) -> Dict[str, str]:
-    """
-    Load translations for a specific language.
-    
-    Args:
-        language: Language code to load translations for
-        
-    Returns:
-        Dictionary of translations
-    """
-    # Return cached translations if already loaded
     if language in _translations:
+        _current_language = language
         return _translations[language]
     
-    # First, ensure we have the default (English) translations loaded
-    if DEFAULT_LANGUAGE not in _translations:
-        try:
-            default_path = os.path.join(TRANSLATIONS_DIR, f"{DEFAULT_LANGUAGE}.json")
-            with open(default_path, 'r', encoding='utf-8') as f:
-                _translations[DEFAULT_LANGUAGE] = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            # If we can't load the default translations, use an empty dict
-            _translations[DEFAULT_LANGUAGE] = {}
-    
-    # If requesting the default language, just return it
-    if language == DEFAULT_LANGUAGE:
-        return _translations[DEFAULT_LANGUAGE]
-    
-    # Try to load the requested language
     try:
-        lang_path = os.path.join(TRANSLATIONS_DIR, f"{language}.json")
-        with open(lang_path, 'r', encoding='utf-8') as f:
-            _translations[language] = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        # If language file doesn't exist or is invalid, use only the default translations
-        _translations[language] = {}
-    
-    # Return a combination of language-specific translations with English fallbacks
-    return {**_translations[DEFAULT_LANGUAGE], **_translations[language]}
-
-
-def get_text(key: str, language: str = DEFAULT_LANGUAGE) -> str:
-    """
-    Get a translated text by key.
-    
-    Args:
-        key: Translation key
-        language: Language code
+        # Get the directory where this file is located
+        i18n_dir = Path(__file__).parent
         
-    Returns:
-        Translated text, falls back to key if not found
+        # Construct the path to the language file
+        lang_file = i18n_dir / f"{language}.json"
+        
+        # If the language file doesn't exist, fall back to English
+        if not lang_file.exists() and language != "en":
+            print(f"Language file for '{language}' not found, falling back to English.")
+            return load_translations("en")
+        
+        # Load the language file
+        with open(lang_file, "r", encoding="utf-8") as f:
+            translations = json.load(f)
+            _translations[language] = translations
+            _current_language = language
+            return translations
+    except Exception as e:
+        print(f"Error loading translations: {str(e)}")
+        # Return an empty dict as fallback
+        return {}
+
+
+def get_text(key, language=None):
     """
-    translations = load_translations(language)
-    return translations.get(key, key)
+    Get the translated text for the specified key.
+    If language is not specified, use the current language.
+    """
+    if language is None:
+        # Use environment variable if set, otherwise use current language
+        language = os.environ.get("PYOC_LANGUAGE", _current_language)
+    
+    # Load translations if not already loaded
+    if language not in _translations:
+        load_translations(language)
+    
+    # Get the translation
+    translation = _translations.get(language, {})
+    
+    # Return the translated text or the key itself if not found
+    return translation.get(key, key)
 
 
-# Initialize by loading the default translations
-load_translations()
+def get_language_from_alias(alias):
+    """
+    Get the language code from an alias.
+    """
+    alias_map = {
+        "en": "en",
+        "english": "en",
+        "eng": "en",
+        "es": "es",
+        "spanish": "es",
+        "español": "es",
+        "espanol": "es",
+        # Add more aliases as needed
+    }
+    
+    return alias_map.get(alias.lower(), None)
