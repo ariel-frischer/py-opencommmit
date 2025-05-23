@@ -5,7 +5,7 @@ from typing import List, Dict, Any, Optional
 import openai
 from openai import AsyncOpenAI
 
-from src.python.engine.base import AiEngine, AiEngineConfig
+from py_opencommit.engine.base import AiEngine, AiEngineConfig
 
 
 class OpenAiEngine(AiEngine):
