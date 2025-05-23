@@ -1,71 +1,114 @@
-"""Githook command implementation for OpenCommit."""
-
 import os
 import stat
+import sys
 from pathlib import Path
-from rich.console import Console
 
-# Use relative import
-from ..utils.git import get_git_root
+from py_opencommit.config import get_config
+from py_opencommit.i18n import get_text
+from rich.console import Console
 
 console = Console()
 
+# Define the hook content as a constant
 HOOK_CONTENT = """#!/usr/bin/env python3
+# PyOC Git Hook
+# This hook is installed by py-opencommit
+
 import sys
 import subprocess
 import os
 
-# Get the commit message file path
+# Get the commit message file path from the arguments
 commit_msg_file = sys.argv[1]
 
-# Check if this is an amended commit or a merge commit
-if os.path.exists(commit_msg_file):
-    with open(commit_msg_file, 'r') as f:
-        commit_msg = f.read().strip() # Read and strip whitespace
+# Read the current commit message
+with open(commit_msg_file, 'r') as f:
+    commit_msg = f.read()
 
-    # Skip if it's a merge commit (starts with Merge) or already has content
-    if commit_msg.startswith('Merge') or commit_msg:
-        sys.exit(0)
+# Skip for merge commits
+if commit_msg.startswith('Merge'):
+    sys.exit(0)
 
-# Run opencommit to generate the commit message
+# Skip if environment variable is set
+if os.environ.get('SKIP_OC'):
+    sys.exit(0)
+
 try:
-    result = subprocess.run(
-        ['oco', 'commit', '--skip-confirmation'],
-        capture_output=True,
-        text=True,
-        check=True
-    )
+    # Run oco command
+    result = subprocess.run(['oco', 'commit', '--skip-confirmation'], 
+                          capture_output=True, text=True, check=True)
     
-    # Extract the generated commit message
+    # Get the output
     commit_msg = result.stdout.strip()
     
-    # Write the commit message to the file
+    # Write the new commit message
     with open(commit_msg_file, 'w') as f:
         f.write(commit_msg)
-    
-    sys.exit(0)
-except subprocess.CalledProcessError:
-    # If opencommit fails, just continue with the normal commit process
-    sys.exit(0)
+        
+except subprocess.CalledProcessError as e:
+    print(f"Error running oco: {e.stderr}")
+    sys.exit(1)
+except Exception as e:
+    print(f"Error: {str(e)}")
+    sys.exit(1)
 """
 
 
-def githook() -> None:
-    """Install the prepare-commit-msg git hook."""
+def get_git_root():
+    """Get the root directory of the git repository."""
+    git_dir = Path(".git")
+    if git_dir.exists():
+        return os.getcwd()
+    return None
+
+
+def githook():
+    """
+    Set up the git hook for the current repository.
+    """
     git_root = get_git_root()
     if not git_root:
-        console.print("[bold red]Error:[/bold red] Not a git repository")
-        return
-    
-    hooks_dir = Path(git_root) / '.git' / 'hooks'
-    hook_path = hooks_dir / 'prepare-commit-msg'
-    
-    # Create the hook file
-    with open(hook_path, 'w') as f:
-        f.write(HOOK_CONTENT)
-    
-    # Make it executable
-    os.chmod(hook_path, os.stat(hook_path).st_mode | stat.S_IEXEC)
-    
-    console.print("[bold green]Success:[/bold green] Git hook installed successfully!")
-    console.print("The hook will automatically generate commit messages when you run 'git commit'.")
+        console.print(f"[bold red]Error:[/bold red] Not a git repository")
+        return False
+
+    try:
+        # Create hooks directory if it doesn't exist
+        hooks_dir = Path(git_root) / ".git" / "hooks"
+        hooks_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create the hook file
+        hook_path = hooks_dir / "prepare-commit-msg"
+        with open(hook_path, "w") as f:
+            f.write(HOOK_CONTENT)
+
+        # Set executable permissions
+        os.chmod(hook_path, stat.S_IEXEC | stat.S_IREAD | stat.S_IWRITE)
+
+        console.print("[bold green]Success:[/bold green] Git hook installed successfully!")
+        return True
+    except Exception as e:
+        console.print(f"[bold red]Error:[/bold red] {str(e)}")
+        return False
+
+
+def remove_githook():
+    """
+    Remove the git hook from the current repository.
+    """
+    git_root = get_git_root()
+    if not git_root:
+        console.print(f"[bold red]Error:[/bold red] Not a git repository")
+        return False
+
+    try:
+        hook_path = Path(git_root) / ".git" / "hooks" / "prepare-commit-msg"
+        if hook_path.exists():
+            hook_path.unlink()
+            console.print("[bold green]Success:[/bold green] Git hook removed successfully!")
+            return True
+        else:
+            console.print("[bold yellow]Warning:[/bold yellow] Git hook not found")
+            return False
+    except Exception as e:
+        console.print(f"[bold red]Error:[/bold red] {str(e)}")
+        return False

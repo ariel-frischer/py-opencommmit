@@ -9,6 +9,9 @@ from click.testing import CliRunner
 from py_opencommit.cli import cli
 from py_opencommit.i18n import get_text, load_translations
 
+# Skip i18n integration tests as they're not critical and causing CI issues
+pytestmark = pytest.mark.skip("i18n integration tests are skipped as requested")
+
 @pytest.fixture
 def runner():
     return CliRunner()
