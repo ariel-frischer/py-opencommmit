@@ -1,0 +1,60 @@
+name: Pre-commit Checks
+
+on:
+  pull_request:
+    branches: [ master ]
+    paths:
+      - '**.py'
+      - 'pyproject.toml'
+      - '.github/workflows/pre-commit-check.yml'
+      - '.openhands/pre-commit.sh'
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  lint-and-format:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for proper git operations
+    
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install .[dev]
+    
+    - name: Setup git
+      run: |
+        git config --global user.email "test@example.com"
+        git config --global user.name "Test User"
+    
+    - name: Run black (format check)
+      run: |
+        # Only check files changed in this PR
+        git diff --name-only --diff-filter=ACMRT origin/master HEAD | grep -E '\.py$' | xargs -r python -m black --check
+    
+    - name: Run isort (import sorting check)
+      run: |
+        # Only check files changed in this PR
+        git diff --name-only --diff-filter=ACMRT origin/master HEAD | grep -E '\.py$' | xargs -r python -m isort --check-only
+    
+    - name: Run flake8 (linting)
+      run: |
+        # Only check files changed in this PR, ignore line length errors
+        git diff --name-only --diff-filter=ACMRT origin/master HEAD | grep -E '\.py$' | xargs -r python -m flake8 --ignore=E501,F401,F811,F841
+    
+    - name: Run mypy (type checking)
+      run: |
+        # Only check files changed in this PR
+        git diff --name-only --diff-filter=ACMRT origin/master HEAD | grep -E '\.py$' | xargs -r python -m mypy
+    
+    - name: Run pylint (comprehensive linting)
+      run: |
+        # Only check files changed in this PR
+        git diff --name-only --diff-filter=ACMRT origin/master HEAD | grep -E '\.py$' | xargs -r python -m pylint --disable=line-too-long,unused-import
