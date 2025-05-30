@@ -336,3 +336,4 @@ Why did I port this? I wanted a full python dependency chain for my application,
 - [X] Commit command seems to work
 - [ ] Have not fully tested `config` command
 - [ ] Have not fully tested `githook` command
+Repobird bot added this!
